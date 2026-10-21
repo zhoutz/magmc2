@@ -22,7 +22,7 @@ bisect_root(T const& func, double x1, double x2, double xacc, double f1,
   if (f1 > 0) {
     std::swap(x1, x2);
   }
-  int i = 50;
+  int i = 64;
   while (i--) {
     if (std::abs(x1 - x2) < xacc)
       return std::midpoint(x1, x2);
