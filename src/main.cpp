@@ -1,7 +1,14 @@
-#include "doubles.hpp"
+// #include "doubles.hpp"
 
+#include <numeric>
+#include <print>
 int
 main() {
-  double3 a{1.0, 2.0, 3.0};
-  a / 0;
+  double a = 1,b=10;
+  while(true){
+    double c = std::midpoint(a, b);
+    if (c == a || c == b) break;
+    b = c;
+  }
+  std::print("{} {} {}\n", a, b, std::midpoint(a, b));
 }
