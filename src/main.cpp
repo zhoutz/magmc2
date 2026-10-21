@@ -5,7 +5,7 @@
 
 double
 f(double x) {
-  return x - 1e-100;
+  return x - (1 - 1e-30);
 }
 
 int
