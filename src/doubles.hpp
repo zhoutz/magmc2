@@ -1,7 +1,7 @@
 #pragma once
 
-#include "check.hpp"
 #include <cmath>
+#include <stdexcept>
 
 struct double3 {
   double x, y, z;
@@ -39,7 +39,9 @@ operator*(double a, double3 const& b) {
 inline
 double3
 operator/(double3 const& a, double b) {
-  CHECK(b != 0.0, "Division by zero.");
+  if (b == 0.0) {
+    throw std::runtime_error("double3/double: Division by zero.");
+  }
   return {a.x / b, a.y / b, a.z / b};
 }
 
