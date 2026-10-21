@@ -1,3 +1,6 @@
----
 BasedOnStyle: LLVM
-Language: Cpp
+BreakAfterReturnType: AllDefinitions
+BreakBeforeReturnType: AllDefinitions
+BreakTemplateDeclarations: Yes
+PointerAlignment: Left
+QualifierAlignment: Right

@@ -8,7 +8,7 @@ from scipy.integrate import solve_bvp
 def solve_twisted_dipole(
     delta_phi: float,
     mu_out: np.ndarray,
-    eps=1e-5,
+    s_pole=1e-5,
     n_mesh=int(1e3),
     n_cont=20,
     tol=1e-8,
@@ -21,8 +21,8 @@ def solve_twisted_dipole(
             "branch; delta_phi=pi is the singular p=0 split-monopole limit."
         )
 
-    if not 0.0 < eps < 1.0 or 1.0 - eps == 1.0:
-        raise ValueError("eps must satisfy 0 < eps < 1 and 1 - eps < 1.")
+    if not 0.0 < s_pole < 1.0 or 1.0 - s_pole == 1.0:
+        raise ValueError("s_pole must satisfy 0 < s_pole < 1 and 1 - s_pole < 1.")
 
     mu_out = np.asarray(mu_out, dtype=np.float64)
 
@@ -42,8 +42,7 @@ def solve_twisted_dipole(
             "fp": fp,
         }
 
-    mu_max = 1.0 - eps
-    s_pole = 1.0 - mu_max
+    mu_max = 1.0 - s_pole
     x = np.linspace(0.0, mu_max, n_mesh)
 
     # Use uniform steps in -log(1 - delta_phi/pi): near the p -> 0 limit,
@@ -83,7 +82,7 @@ def solve_twisted_dipole(
             p, log_A = pars
             s = s_pole
 
-            # Polar expansion at mu = 1 - eps.
+            # Polar expansion at mu = 1 - s_pole.
             f_pole = 2.0 * s - 0.5 * p * (p + 1.0) * s**2
             fp_pole = -2.0 + p * (p + 1.0) * s
 
@@ -94,8 +93,8 @@ def solve_twisted_dipole(
                 [
                     ya[1],  # f'(0) = 0
                     ya[2],  # Phi(0) = 0
-                    yb[0] - f_pole,  # f(1 - eps)
-                    yb[1] - fp_pole,  # f'(1 - eps)
+                    yb[0] - f_pole,  # f(1 - s_pole)
+                    yb[1] - fp_pole,  # f'(1 - s_pole)
                     yb[2] + phi_tail - target_delta_phi,
                 ]
             )
@@ -124,7 +123,7 @@ def solve_twisted_dipole(
                 f"Continuation step {istep + 1}/{n_cont}, "
                 f"target={target_delta_phi:.6g}: {sol.message} "
                 f"nodes={sol.x.size}, "
-                f"max_residual={np.max(sol.rms_residuals):.3g}, eps={eps:.3g}. "
+                f"max_residual={np.max(sol.rms_residuals):.3g}, s_pole={s_pole:.3g}. "
             )
 
         # Keep the solution, but interpolate back to the base mesh each step.
