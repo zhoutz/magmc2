@@ -39,7 +39,7 @@ operator*(double a, double3 const& b) {
 inline
 double3
 operator/(double3 const& a, double b) {
-  check(b != 0.0, "Division by zero");
+  CHECK(b != 0.0, "Division by zero.");
   return {a.x / b, a.y / b, a.z / b};
 }
 
