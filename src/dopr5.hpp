@@ -52,9 +52,6 @@ struct StepperDopr5 {
   add_event(EventFunc event_func) {
     events.emplace_back(Event{
         .func = std::move(event_func),
-        // .x = 0,
-        // .sign = 0,
-        // .active = false,
     });
   }
 

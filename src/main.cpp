@@ -1,14 +1,17 @@
-// #include "doubles.hpp"
 
+#include "find_root.hpp"
 #include <numeric>
 #include <print>
+
+double
+f(double x) {
+  return x - 1e-100;
+}
+
 int
 main() {
-  double a = 1,b=10;
-  while(true){
-    double c = std::midpoint(a, b);
-    if (c == a || c == b) break;
-    b = c;
-  }
-  std::print("{} {} {}\n", a, b, std::midpoint(a, b));
+  double a = 0, b = 1;
+  // double root = bisect_root(f, a, b, 0, f(a), f(b));
+  double root = ridders_root(f, a, b, 0, f(a), f(b));
+  std::print("Root: {}\n", root);
 }
