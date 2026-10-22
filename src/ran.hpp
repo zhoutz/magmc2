@@ -9,7 +9,7 @@ struct Ran {
   Ran(unsigned long long seed) { set_seed(seed); }
 
   unsigned long long
-  int64() {
+  uint64() {
     u = u * 2862933555777941757LL + 7046029254386353087LL;
     v ^= v >> 17;
     v ^= v << 31;
@@ -26,16 +26,20 @@ struct Ran {
     v = 4101842887655102017LL;
     w = 1;
     u = seed ^ v;
-    int64();
+    uint64();
     v = u;
-    int64();
+    uint64();
     w = v;
-    int64();
+    uint64();
   }
 
   double
   U() {
-    return 5.42101086242752217E-20 * (double)int64();
+    double x;
+    do {
+      x = 5.42101086242752217E-20 * (double)uint64();
+    } while (x <= 0 || x >= 1);
+    return x;
   }
 
   double
