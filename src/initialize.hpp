@@ -55,13 +55,10 @@ sample_planck_number(Ran& ran) {
 // rs is the Schwarzschild radius and R_star the stellar radius, both in km.
 inline
 InitializedPhoton
-sample_initial_photon_fd11(Ran& ran, double rs, double R_star, double T_inf,
+sample_initial_photon_fd11(Ran& ran, double R_star, double T_inf,
                            InitialPhotonOptions const& options = {}) {
   if (!std::isfinite(R_star) || R_star <= 0)
     throw std::invalid_argument("R_star must be positive and finite");
-  if (!std::isfinite(rs) || rs < 0 || rs >= R_star)
-    throw std::invalid_argument(
-        "rs must be finite and satisfy 0 <= rs < R_star");
   if (!std::isfinite(T_inf) || T_inf <= 0)
     throw std::invalid_argument("T_inf must be positive and finite");
   if (!std::isfinite(options.cap_half_angle) || options.cap_half_angle <= 0 ||
