@@ -9,9 +9,9 @@
 
 template <class T>
 concept ParticleDistribution = requires(T b, double x) {
-  { b.b_min } -> std::same_as<double>;
-  { b.b_max } -> std::same_as<double>;
-  { b.inv_abs_b_mean } -> std::same_as<double>;
+  { b.b_min } -> std::convertible_to<double>;
+  { b.b_max } -> std::convertible_to<double>;
+  { b.inv_abs_b_mean } -> std::convertible_to<double>;
   { b.f(x) } -> std::same_as<double>;
 };
 

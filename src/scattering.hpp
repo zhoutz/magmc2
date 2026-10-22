@@ -7,4 +7,5 @@ struct ResonantScattering {
   Dist dist;
   int charge_sign;
   double current_fraction;
+  double charge_mass_ratio;
 };
