@@ -26,18 +26,6 @@ struct InitialPhotonOptions {
 };
 
 namespace initialize_fd11_detail {
-
-inline
-double
-open_unit(Ran& ran) {
-  // Ran::U() can return zero, or round its integer conversion to one.
-  double u;
-  do {
-    u = ran.U();
-  } while (u <= 0 || u >= 1);
-  return u;
-}
-
 inline
 double
 sample_planck_number(Ran& ran) {
@@ -47,15 +35,15 @@ sample_planck_number(Ran& ran) {
   // with probabilities 1/[zeta(3)*m^3], m = 1, 2, ... .
   double m, acceptance;
   do {
-    m = std::floor(1 / std::sqrt(open_unit(ran)));
+    m = std::floor(1 / std::sqrt(ran.U()));
     // Proposal q(m) = 1/m^2 - 1/(m+1)^2; q(m)*acceptance = 3/(4*m^3).
     // Use a double for m: Ran's smallest positive U is 2^-64, so m <= 2^32.
     acceptance = 3 * (m + 1) * (m + 1) / (4 * m * (2 * m + 1));
-  } while (open_unit(ran) >= acceptance);
+  } while (ran.U() >= acceptance);
 
   double x = 0;
   for (int i = 0; i < 3; ++i)
-    x -= std::log(open_unit(ran));
+    x -= std::log(ran.U());
   return x / m;
 }
 
@@ -87,7 +75,6 @@ sample_initial_photon_fd11(Ran& ran, double rs, double R_star, double T_inf,
       options.e_mode_fraction > 1)
     throw std::invalid_argument("e_mode_fraction must be finite and in [0, 1]");
 
-  using initialize_fd11_detail::open_unit;
   // The Fortran seed routine blueshifts its LOCAL energy. Here we store the
   // conserved energy at infinity; propagation uses omega_inf/sqrt(1-rs/r).
   double omega_inf = T_inf * initialize_fd11_detail::sample_planck_number(ran);
@@ -95,10 +82,10 @@ sample_initial_photon_fd11(Ran& ran, double rs, double R_star, double T_inf,
     throw std::runtime_error(
         "Initial photon energy is not finite and positive");
 
-  double pole = open_unit(ran) < options.north_fraction ? 1 : -1;
+  double pole = ran.U() < options.north_fraction ? 1 : -1;
   double sin_half_cap = std::sin(options.cap_half_angle / 2);
   // d = 1 - |cos(theta)|, avoiding subtraction at small cap radii.
-  double d = 2 * sin_half_cap * sin_half_cap * open_unit(ran);
+  double d = 2 * sin_half_cap * sin_half_cap * ran.U();
   double rho = std::sqrt(d * (2 - d));
   double c, s;
   ran.point_on_unit_circle(c, s);
@@ -109,8 +96,8 @@ sample_initial_photon_fd11(Ran& ran, double rs, double R_star, double T_inf,
   // Isotropic surface intensity gives outgoing flux p(mu) = 2*mu, mu in [0,1].
   // This is mustar = sqrt(RAND) in magmc_2019/src/physics.F90, seed().
   // Choosing n independently keeps the basis regular even for radial rays.
-  double alpha0 = std::acos(std::sqrt(open_unit(ran)));
-  Polarization pol = open_unit(ran) < options.e_mode_fraction ? Polarization::E
-                                                              : Polarization::O;
+  double alpha0 = std::acos(std::sqrt(ran.U()));
+  Polarization pol =
+      ran.U() < options.e_mode_fraction ? Polarization::E : Polarization::O;
   return {n, e1, e2, omega_inf, R_star, 0, alpha0, pol};
 }
