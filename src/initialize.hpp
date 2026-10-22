@@ -2,18 +2,17 @@
 
 #include "constants.hpp"
 #include "doubles.hpp"
+#include "polarization.hpp"
 #include "ran.hpp"
 #include <cmath>
 #include <stdexcept>
-
-enum class Polarization { O, E };
 
 struct InitializedPhoton {
   double3 n, e1, e2; // fixed, right-handed orbital basis: e1 x e2 = n
   double omega_inf;  // photon energy hbar * omega at infinity, in keV
   // Radius in km; orbital and propagation angles in radians.
   double r0, psi0, alpha0;
-  Polarization pol;
+  AdiabaticPolarization pol;
 };
 
 struct InitialPhotonOptions {
@@ -94,7 +93,8 @@ sample_initial_photon_fd11(Ran& ran, double R_star, double T_inf,
   // This is mustar = sqrt(RAND) in magmc_2019/src/physics.F90, seed().
   // Choosing n independently keeps the basis regular even for radial rays.
   double alpha0 = std::acos(std::sqrt(ran.U()));
-  Polarization pol =
-      ran.U() < options.e_mode_fraction ? Polarization::E : Polarization::O;
+  AdiabaticPolarization pol = ran.U() < options.e_mode_fraction
+                                  ? AdiabaticPolarization::E
+                                  : AdiabaticPolarization::O;
   return {n, e1, e2, omega_inf, R_star, 0, alpha0, pol};
 }

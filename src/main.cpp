@@ -15,6 +15,8 @@ main() {
   for (int i = 0; i < 10; ++i) {
     auto photon = sample_initial_photon_fd11(ran, R_star, T_inf);
     geodesic.init(photon.r0, photon.psi0, photon.alpha0);
+    while (true) {
+      bool absorbed = geodesic.step();
+    }
   }
 }
-
