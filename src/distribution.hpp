@@ -129,3 +129,63 @@ private:
            0.5 * (std::log1p(delta / (1 - hi)) - std::log1p(delta / (1 + lo)));
   }
 };
+
+// PowerLaw with alpha_pl = -2; both normalization and mean are analytic.
+struct PowerLaw2 {
+  double b_min, b_max;
+  double inv_abs_b_mean;
+
+  PowerLaw2(double b_min, double b_max) : b_min(b_min), b_max(b_max) {
+    if (!std::isfinite(b_min) || b_min <= 0 || b_min >= 1) {
+      throw std::runtime_error(
+          "Invalid b_min value for PowerLaw2 distribution");
+    }
+    if (!std::isfinite(b_max) || b_max <= 0 || b_max >= 1) {
+      throw std::runtime_error(
+          "Invalid b_max value for PowerLaw2 distribution");
+    }
+    if (b_min >= b_max) {
+      throw std::runtime_error(
+          "Invalid range: b_min must be less than b_max for PowerLaw2 "
+          "distribution");
+    }
+
+    double s_min = std::sqrt((1 - b_min) * (1 + b_min));
+    double s_max = std::sqrt((1 - b_max) * (1 + b_max));
+    double delta = b_max - b_min;
+    double ratio = b_min / b_max;
+
+    // N = 1/u_min - 1/u_max = s_min/b_min - s_max/b_max.
+    // Rationalize the difference to retain accuracy for narrow intervals:
+    // 1/N = b_min*b_max*(b_max*s_min + b_min*s_max)
+    //       / [(b_max-b_min)*(b_max+b_min)]. Use ratios to avoid tiny products.
+    inv_norm =
+        b_min * ((s_min + ratio * s_max) / ((delta / b_max) * (1 + ratio)));
+
+    // The unnormalized first moment is
+    // M = log[u_max*(gamma_min+1)/(u_min*(gamma_max+1))]
+    //   = log(b_max/b_min) + log[(1+s_min)/(1+s_max)].
+    // s_min-s_max = delta*(b_max+b_min)/(s_min+s_max).
+    double log_speed_ratio = b_max > 2 * b_min
+                                 ? std::log(b_max) - std::log(b_min)
+                                 : std::log1p(delta / b_min);
+    double moment =
+        log_speed_ratio +
+        std::log1p(delta * (b_max + b_min) / ((s_min + s_max) * (1 + s_max)));
+    inv_abs_b_mean = 1 / (inv_norm * moment);
+  }
+
+  double
+  f(double b) const {
+    if (!std::isfinite(b) || b <= b_min || b >= b_max) {
+      return 0;
+    }
+    double s = std::sqrt((1 - b) * (1 + b));
+    // gamma^3/u^2 = 1/[beta^2*sqrt(1-beta^2)]. Divide successively
+    // instead of forming beta^2, which can underflow at small speeds.
+    return ((inv_norm / b) / b) / s;
+  }
+
+private:
+  double inv_norm;
+};
