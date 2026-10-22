@@ -52,9 +52,4 @@ struct Geodesic {
     dydx[1] = std::sin(alpha) / r;
     dydx[2] = -std::sin(alpha) / (r * L) * (1 - 3 * rs / (2 * r));
   }
-
-  Geodesic(Geodesic const&) = delete;
-  Geodesic& operator=(Geodesic const&) = delete;
-  Geodesic(Geodesic&&) = delete;
-  Geodesic& operator=(Geodesic&&) = delete;
 };
