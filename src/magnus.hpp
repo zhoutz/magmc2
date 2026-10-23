@@ -1,6 +1,11 @@
 #pragma once
 
 #include "polarization.hpp"
+#include <algorithm>
+#include <array>
+#include <cmath>
+#include <numeric>
+#include <stdexcept>
 
 struct Rotation {
   double w = 1;
@@ -9,12 +14,15 @@ struct Rotation {
   static
   Rotation
   exponential(double3 a) {
-    double angle = a.length();
+    double angle = std::hypot(a.x, a.y, a.z);
+    if (!std::isfinite(angle))
+      throw std::runtime_error("Non-finite rotation in StepperMagnus");
     double scale =
         angle < 1e-10 ? 0.5 - angle * angle / 48 : std::sin(angle / 2) / angle;
     return {std::cos(angle / 2), scale * a};
   }
 
+  // Apply before first, then after.
   static
   Rotation
   compose(Rotation after, Rotation before) {
@@ -29,79 +37,205 @@ struct Rotation {
   }
 };
 
-
-
-
-
-
+// Fourth-order commutator-free Magnus integration of S' = omega(x) cross S.
+// DerivFunc is a caller-owned callable returning double3, independent of S.
+// Tolerances control the endpoint step-doubling estimate, NOT an independent
+// dense error estimate. Fourth-order accuracy requires smooth coefficients.
+// Only the latest accepted step is cached; dense queries never call derivs.
 template <class DerivFunc>
 struct StepperMagnus {
-  static constexpr double EPS = std::numeric_limits<double>::epsilon();
-  
   DerivFunc const& derivs;
-  double x_old, h_old, x_max;
-  // double3 y_old, y_new, y_err;
+  double x_old = 0, x_new = 0, x_max = 0;
+  double h_old = 0, h_new = 0;
+  Stokes y_old{}, y_new{};
   double atol, rtol;
 
   StepperMagnus(DerivFunc const& derivs, double atol, double rtol)
-      : derivs(derivs), atol(atol), rtol(rtol) {}
-
-
-  void
-  init(double x_init, double h_init, double x_end, double3 const& y_init) {
-    if (!(std::isfinite(h_init) && h_init > 0)) {
-      throw std::invalid_argument("h_init must be positive and finite");
-    }
-    x_old = x_init;
-    h_old = h_init;
-    x_max = x_end;
-    // y_old = y_init;
-    // derivs(x_old, y_old, dydx_old);
-    
+      : derivs(derivs), atol(atol), rtol(rtol) {
+    validate_tolerances();
   }
 
-  template <class F>
-Rotation
-magnus(F const& omega, double x, double h) {
-  constexpr double g = 0.28867513459481288225;
-  constexpr double a = 0.53867513459481288225, b = -0.03867513459481288225;
-  auto c1 = omega(x + (0.5 - g) * h), c2 = omega(x + (0.5 + g) * h);
-  auto first = Rotation::exponential(h * (a * c1.omega() + b * c2.omega()));
-  auto second = Rotation::exponential(h * (b * c1.omega() + a * c2.omega()));
-  return Rotation::compose(second, first);
-}
-
   void
+  init(double x_init, double h_init, double x_end, Stokes const& y_init) {
+    prepared = false;
+    validate_tolerances();
+    if (!(std::isfinite(h_init) && h_init > 0))
+      throw std::invalid_argument("h_init must be positive and finite");
+    if (!std::isfinite(x_init) || !std::isfinite(x_end) || x_end < x_init ||
+        !std::isfinite(x_end - x_init) || !finite(y_init) ||
+        !std::isfinite(norm(y_init)))
+      throw std::invalid_argument(
+          "Invalid interval or Stokes in StepperMagnus");
+    x_old = x_new = x_init;
+    x_max = x_end;
+    h_old = h_new = h_init;
+    y_old = y_new = y_init;
+  }
+
+  // Inspect/integrate optical depth using dense_out before update_old().
+  // false means the initialized interval has been completely committed.
+  bool
   do_step() {
-    h_old = std::min(h_old, max_step);
+    if (prepared)
+      throw std::logic_error(
+          "StepperMagnus requires update_old() before stepping");
+    if (x_old == x_max)
+      return false;
+
+    double requested = std::min({h_old, x_max - x_old});
     while (true) {
-      if (std::abs(h_old) <= std::abs(x_old) * EPS) {
-        throw std::runtime_error("stepsize underflow in StepperDopr5");
+      double end = requested == x_max - x_old
+                       ? x_max
+                       : std::min(x_old + requested, x_max);
+      // Addition can round upward: respect the requested maximum even then.
+      if (end - x_old > requested)
+        end = std::nextafter(end, x_old);
+      double mid = std::midpoint(x_old, end);
+      if (!(x_old < mid && mid < end))
+        throw std::runtime_error("Stepsize underflow in StepperMagnus");
+      double h = end - x_old;
+      Segment whole = sample(x_old, end);
+      Segment first = sample(x_old, mid), second = sample(mid, end);
+      first.before = y_old;
+      first.after = second.before = first.rotation.apply(y_old);
+      second.after = second.rotation.apply(first.after);
+      auto coarse = whole.rotation.apply(y_old);
+      auto delta = (1.0 / 15) * (second.after + (-1.0) * coarse);
+      double scale = atol + rtol * std::max(norm(y_old), norm(second.after));
+      double absolute_error = norm(delta);
+      // Pure relative tolerance is meaningful for S=0: all rotations fix it.
+      double err = absolute_error == 0 ? 0 : absolute_error / scale;
+      if (!finite(second.after) || !finite(delta) || !std::isfinite(scale) ||
+          !std::isfinite(err))
+        throw std::runtime_error("Non-finite error in StepperMagnus");
+      double factor =
+          err == 0 ? 3 : std::clamp(0.9 * std::pow(err, -0.2), 0.2, 3.0);
+      if (err > 1) {
+        requested = h * factor;
+        continue;
       }
-      try_step();
-      if (success(error()))
-        break;
+
+      // Reuse the four accepted Gauss samples; only three new endpoint
+      // evaluations are needed because the two halves share their midpoint.
+      first.omega[0] = coefficient(x_old);
+      first.omega[3] = second.omega[0] = coefficient(mid);
+      second.omega[3] = coefficient(end);
+      segments = {first, second};
+      x_new = end;
+      h_old = h;
+      h_new = h * factor;
+      y_new = second.after;
+      prepared = true;
+      return true;
     }
-    prepare_dense();
   }
 
   void
   update_old() {
-    dydx_old = dydx_new;
+    if (!prepared)
+      throw std::logic_error("StepperMagnus has no accepted step to commit");
+    x_old = x_new;
     y_old = y_new;
-    x_old += h_old;
     h_old = h_new;
+    prepared = false;
   }
 
+  Stokes
+  dense_out(double x) const {
+    if (!prepared)
+      throw std::logic_error(
+          "StepperMagnus dense output requires an accepted step");
+    if (!(x >= x_old && x <= x_new))
+      throw std::out_of_range("StepperMagnus dense output outside step");
+    return (x <= segments[0].end ? segments[0] : segments[1]).at(x);
+  }
+
+private:
+  static constexpr double g = 0.28867513459481288225;
+  static constexpr std::array<double, 4> nodes{0, 0.5 - g, 0.5 + g, 1};
+
+  static
+  bool
+  finite(double3 s) {
+    return std::isfinite(s.x) && std::isfinite(s.y) && std::isfinite(s.z);
+  }
+
+  static
+  double
+  norm(double3 s) {
+    return std::hypot(s.x, s.y, s.z);
+  }
 
   void
-  prepare_dense() {
-    
+  validate_tolerances() const {
+    if (!std::isfinite(atol) || !std::isfinite(rtol) || atol < 0 || rtol < 0 ||
+        (atol == 0 && rtol == 0))
+      throw std::invalid_argument("Invalid tolerances in StepperMagnus");
   }
+
+  static
+  Rotation
+  magnus_rotation(double3 w1, double3 w2, double h) {
+    constexpr double a = 0.53867513459481288225, b = -0.03867513459481288225;
+    auto first = Rotation::exponential(h * (a * w1 + b * w2));
+    auto second = Rotation::exponential(h * (b * w1 + a * w2));
+    return Rotation::compose(second, first);
+  }
+
+  struct Segment {
+    double begin = 0, end = 0;
+    Stokes before{}, after{};
+    std::array<double3, 4> omega{};
+    Rotation rotation;
+
+    double3
+    interpolate(double t) const {
+      double3 result{};
+      for (std::size_t i = 0; i < nodes.size(); ++i) {
+        if (t == nodes[i])
+          return omega[i];
+        double weight = 1;
+        for (std::size_t j = 0; j < nodes.size(); ++j)
+          if (j != i)
+            weight *= (t - nodes[j]) / (nodes[i] - nodes[j]);
+        result = result + weight * omega[i];
+      }
+      return result;
+    }
+
+    Stokes
+    at(double x) const {
+      if (x == begin)
+        return before;
+      if (x == end)
+        return after;
+      double t = (x - begin) / (end - begin);
+      return magnus_rotation(interpolate(t * nodes[1]),
+                             interpolate(t * nodes[2]), x - begin)
+          .apply(before);
+    }
+  };
+
+  std::array<Segment, 2> segments{};
+  bool prepared = false;
 
   double3
-  dense_out(double x) const {
-    
+  coefficient(double x) const {
+    auto w = derivs(x);
+    if (!finite(w))
+      throw std::runtime_error("Non-finite generator in StepperMagnus");
+    return w;
   }
 
+  Segment
+  sample(double begin, double end) const {
+    Segment segment;
+    segment.begin = begin;
+    segment.end = end;
+    for (int i : {1, 2})
+      segment.omega[i] = coefficient(std::lerp(begin, end, nodes[i]));
+    segment.rotation =
+        magnus_rotation(segment.omega[1], segment.omega[2], end - begin);
+    return segment;
+  }
 };
