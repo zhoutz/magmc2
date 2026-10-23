@@ -2,6 +2,7 @@
 #include "geodesic.hpp"
 #include "initialize.hpp"
 #include "ran.hpp"
+#include "magnus.hpp"
 
 double eta_couple = 1e-3;
 
@@ -33,7 +34,8 @@ struct PhotonEvolution {
   Init const& initializer;
   Ran ran;
   Geodesic geodesic;
-
+  StepperMagnus<> stokes_stepper;
+  
   double3 n, e1, e2;
   double omega_inf;
   Polarization pol;
@@ -57,6 +59,17 @@ struct PhotonEvolution {
   void
   evolve() {
     bool absorbed = geodesic.step();
+    stokes_stepper.init(geodesic.l_old(), h_pol, geodesic.l_new(), stokes);
+
+    while (stokes_stepper.do_step()) {
+      // 在 [x_old, x_new] 内积分散射光深。
+      // 任意采样点 l：
+      //   geometry = geodesic.interp(l);
+      //   S = stokes_stepper.dense_out(l);
+      // 若发生散射，在此定位、读取状态并退出。
+      stokes_stepper.update_old();
+    }
+    // 保存末态和 h_new，再提交当前测地线步。
   }
 };
 

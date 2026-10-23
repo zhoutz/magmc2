@@ -50,15 +50,13 @@ struct StepperMagnus {
   Stokes y_old{}, y_new{};
   double atol, rtol;
 
-  StepperMagnus(DerivFunc const& derivs, double atol, double rtol)
+  StepperMagnus(DerivFunc const& derivs, double atol = 1e-6, double rtol = 1e-6)
       : derivs(derivs), atol(atol), rtol(rtol) {
     validate_tolerances();
   }
 
   void
   init(double x_init, double h_init, double x_end, Stokes const& y_init) {
-    prepared = false;
-    validate_tolerances();
     if (!(std::isfinite(h_init) && h_init > 0))
       throw std::invalid_argument("h_init must be positive and finite");
     if (!std::isfinite(x_init) || !std::isfinite(x_end) || x_end < x_init ||
@@ -70,6 +68,7 @@ struct StepperMagnus {
     x_max = x_end;
     h_old = h_new = h_init;
     y_old = y_new = y_init;
+    prepared = false;
   }
 
   // Inspect/integrate optical depth using dense_out before update_old().
