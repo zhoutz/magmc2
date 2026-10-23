@@ -374,7 +374,7 @@ struct PhotonEvolution {
                           y[0] / (stepper.x_new - stepper.x_old);
           if (change < options.escape_tolerance &&
                   resonance_escape(stepper.x_new) ||
-              y[0] > 1e4 * geodesic.R_star) {
+              (y[0] > 1e4 * geodesic.R_star && std::cos(y[2]) > 0)) {
             record_escape(stepper.x_new, y);
             return EvolveResult::Escaped;
           }
@@ -441,16 +441,20 @@ main() {
   PhotonEvolution photon(M_star, R_star, 42, bfield, initializer,
                          powerlaw_electron);
   photon.init();
-  auto result = photon.evolve();
-  if (result == decltype(photon)::EvolveResult::Scattered) {
-    std::println("Scattered: beta={} tau={}", photon.scattered_data.beta,
-                 photon.tau);
-    photon.perform_scattering();
-  } else if (result == decltype(photon)::EvolveResult::Escaped) {
-    auto const& e = photon.escaped_data;
-    std::println("Escaped: omega_inf={} muk={} Q={} U={} V={}", e.omega_inf,
-                 e.muk, e.Q, e.U, e.V);
-  } else {
-    std::println("Absorbed");
+  while (true) {
+    auto result = photon.evolve();
+    if (result == decltype(photon)::EvolveResult::Scattered) {
+      std::println("Scattered: beta={} tau={}", photon.scattered_data.beta,
+                   photon.tau);
+      photon.perform_scattering();
+    } else if (result == decltype(photon)::EvolveResult::Escaped) {
+      auto const& e = photon.escaped_data;
+      std::println("Escaped: omega_inf={} muk={} Q={} U={} V={}", e.omega_inf,
+                   e.muk, e.Q, e.U, e.V);
+      break;
+    } else {
+      std::println("Absorbed");
+      break;
+    }
   }
 }

@@ -11,7 +11,6 @@ struct Quad {
   gsl_integration_workspace* workspace = gsl_integration_workspace_alloc(limit);
   Quad() { gsl_set_error_handler_off(); }
   ~Quad() { gsl_integration_workspace_free(workspace); }
-  Quad(Quad const&) = delete;
 
   template <class F>
   double
@@ -32,4 +31,7 @@ struct Quad {
     }
     return result;
   }
+
+  Quad(Quad const&) = delete;
+  Quad& operator=(Quad const&) = delete;
 };
