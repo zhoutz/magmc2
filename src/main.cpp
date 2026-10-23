@@ -1,17 +1,19 @@
 #include "bfield.hpp"
+#include "component.hpp"
 #include "find_root.hpp"
 #include "geodesic.hpp"
 #include "initialize.hpp"
 #include "magnus.hpp"
 #include "ran.hpp"
 
-template <PhotonInitializer Init>
+template <PhotonInitializer Init, typename Comp>
 struct PhotonEvolution {
   struct Options {
     double eta_couple = 1e-3;
   } options;
   BField const& bfield;
   Init const& initializer;
+  Comp const& comp;
   Ran ran;
   Geodesic geodesic;
 
@@ -23,13 +25,13 @@ struct PhotonEvolution {
   Stokes stokes;
 
   PhotonEvolution(double M_star, double R_star, int seed, BField const& bfield,
-                  Init const& init)
-      : PhotonEvolution(M_star, R_star, seed, bfield, init, Options{}) {}
+                  Init const& init, Comp const& comp)
+      : PhotonEvolution(M_star, R_star, seed, bfield, init, comp, Options{}) {}
 
   PhotonEvolution(double M_star, double R_star, int seed, BField const& bfield,
-                  Init const& init, Options options)
-      : options(options), bfield(bfield), initializer(init), ran(seed),
-        geodesic(M_star, R_star) {}
+                  Init const& init, Comp const& comp, Options options)
+      : options(options), bfield(bfield), initializer(init), comp(comp),
+        ran(seed), geodesic(M_star, R_star) {}
 
   void
   init() {
@@ -144,7 +146,18 @@ main() {
   double T_inf = 0.4;
   BField bfield("table/bfield_t10.txt", B_pole, R_star);
   InitFD11 initializer(R_star, T_inf);
-  PhotonEvolution photon_evolution(M_star, R_star, 42, bfield, initializer);
+  auto powerlaw_electron = CurrentComponent{.dist = PowerLaw2(0.2, 0.8),
+                                            .charge_sign = -1,
+                                            .current_fraction = 0.5,
+                                            .charge_mass_ratio = 1.0};
+  auto powerlaw_proton =
+      CurrentComponent{.dist = PowerLaw2(0.2, 0.8),
+                       .charge_sign = 1,
+                       .current_fraction = 0.5,
+                       .charge_mass_ratio = 1.0 / 1836.15267343};
+  PhotonEvolution photon_evolution(
+      M_star, R_star, 42, bfield, initializer,
+      std::make_tuple(powerlaw_electron, powerlaw_proton));
   photon_evolution.init();
   photon_evolution.evolve();
 }

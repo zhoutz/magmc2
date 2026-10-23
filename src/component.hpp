@@ -3,7 +3,7 @@
 #include "distribution.hpp"
 
 template <ParticleDistribution Dist>
-struct ResonantScattering {
+struct CurrentComponent {
   Dist dist;
   int charge_sign;
   double current_fraction;
