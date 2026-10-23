@@ -283,7 +283,7 @@ struct PhotonEvolution {
     if (std::cos(y[2]) <= 0)
       return false; // Infinity reconstruction is only for the outgoing branch.
     auto b = basis(y);
-    double h = std::min(1e-4 * b.r, 0.1 * (b.r - geodesic.rs));
+    double h = 1e-3 * geodesic.stepper.h_old;
     auto minus = get_basis(l - h);
     double dx = (b.x_e - minus.x_e) / (h);
     double dmu = (b.mu - minus.mu) / (h);
@@ -373,14 +373,15 @@ struct PhotonEvolution {
           double change = (stepper.y_new + (-1.0) * stepper.y_old).length() *
                           y[0] / (stepper.x_new - stepper.x_old);
           if (change < options.escape_tolerance &&
-              resonance_escape(stepper.x_new)) {
+                  resonance_escape(stepper.x_new) ||
+              y[0] > 1e4 * geodesic.R_star) {
             record_escape(stepper.x_new, y);
             return EvolveResult::Escaped;
           }
           stepper.update_old();
         }
       }
-      if (absorbed)
+      if (absorbed || geodesic.stepper.y_new[0] <= geodesic.R_star)
         return EvolveResult::Absorbed;
       geodesic.stepper.update_old();
     }
