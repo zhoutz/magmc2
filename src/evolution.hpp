@@ -212,11 +212,29 @@ struct PhotonEvolution {
   std::vector<double>
   integration_cuts(double left, double right) const {
     std::vector<double> cuts{left, std::midpoint(left, right), right};
-    auto scan = [&](auto const& f) {
-      double a = left, fa = f(a);
-      for (int j = 1; j <= options.n_scan; ++j) {
-        double b = std::lerp(left, right, double(j) / options.n_scan),
-               fb = f(b);
+    struct ScanPoint {
+      double l, x, mu;
+    };
+    auto sample = [&](double l) {
+      auto b = get_basis(l);
+      return ScanPoint{l, comp.charge_mass_ratio * b.x_e, b.mu};
+    };
+    // All boundary functions share this grid. Cache only the geometry they
+    // need; root-finding trial points still evaluate the actual trajectory.
+    std::vector<ScanPoint> grid;
+    grid.reserve(options.n_scan + 1);
+    grid.push_back(sample(left));
+    for (int j = 1; j <= options.n_scan; ++j)
+      grid.push_back(sample(std::lerp(left, right, double(j) / options.n_scan)));
+
+    auto scan = [&](auto const& value) {
+      auto f = [&](double l) {
+        auto point = sample(l);
+        return value(point.x, point.mu);
+      };
+      double a = grid.front().l, fa = value(grid.front().x, grid.front().mu);
+      for (size_t j = 1; j < grid.size(); ++j) {
+        double b = grid[j].l, fb = value(grid[j].x, grid[j].mu);
         if (fa == 0)
           cuts.push_back(a);
         if (fb == 0)
@@ -228,15 +246,11 @@ struct PhotonEvolution {
       }
     };
 
-    scan([&](double l) {
-      auto b = get_basis(l);
-      return discriminant(comp.charge_mass_ratio * b.x_e, b.mu);
-    });
+    scan([](double x, double mu) { return discriminant(x, mu); });
     for (double beta : knots) {
       double inv_gamma = std::sqrt((1 - beta) * (1 + beta));
-      scan([&](double l) {
-        auto b = get_basis(l);
-        return comp.charge_mass_ratio * b.x_e * inv_gamma + beta * b.mu - 1;
+      scan([&](double x, double mu) {
+        return x * inv_gamma + beta * mu - 1;
       });
     }
 
