@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <limits>
 #include <numeric>
 #include <stdexcept>
 
@@ -45,7 +46,7 @@ struct Rotation {
 struct StepperMagnus {
   double x_old = 0, x_new = 0, x_max = 0;
   double h_old = 0, h_new = 0;
-  Stokes y_old{}, y_new{};
+  Stokes y_old{}, y_new{}, y_err{};
   double atol, rtol;
 
   StepperMagnus(double atol = 1e-6, double rtol = 1e-6)
@@ -66,6 +67,7 @@ struct StepperMagnus {
     x_max = x_end;
     h_old = h_new = h_init;
     y_old = y_new = y_init;
+    initialized = true;
     prepared = false;
   }
 
@@ -73,14 +75,26 @@ struct StepperMagnus {
   // false means the initialized interval has been completely committed.
   template <class DerivFunc>
   bool
-  do_step(DerivFunc const& derivs) {
+  do_step(DerivFunc const& derivs,
+          double max_step = std::numeric_limits<double>::infinity(),
+          double max_phase = std::numeric_limits<double>::infinity()) {
+    if (!(max_step > 0) || !(max_phase > 0))
+      throw std::invalid_argument(
+          "Magnus step and phase limits must be positive");
+    if (!initialized)
+      throw std::logic_error("StepperMagnus requires initialization");
     if (prepared)
       throw std::logic_error(
           "StepperMagnus requires update_old() before stepping");
     if (x_old == x_max)
       return false;
 
-    double requested = std::min({h_old, x_max - x_old});
+    double requested = std::min({h_old, x_max - x_old, max_step});
+    if (std::isfinite(max_phase)) {
+      double w = norm(coefficient(derivs, x_old));
+      if (w > 0)
+        requested = std::min(requested, max_phase / w);
+    }
     while (true) {
       double end = requested == x_max - x_old
                        ? x_max
@@ -119,11 +133,21 @@ struct StepperMagnus {
       first.omega[0] = coefficient(derivs, x_old);
       first.omega[3] = second.omega[0] = coefficient(derivs, mid);
       second.omega[3] = coefficient(derivs, end);
+      // A small error for an eigenmode does not imply a resolved phase.
+      double peak = 0;
+      for (auto const& segment : {whole, first, second})
+        for (auto w : segment.omega)
+          peak = std::max(peak, norm(w));
+      if (std::isfinite(max_phase) && peak * h > max_phase) {
+        requested = 0.9 * max_phase / peak;
+        continue;
+      }
       segments = {first, second};
       x_new = end;
       h_old = h;
       h_new = h * factor;
       y_new = second.after;
+      y_err = delta;
       prepared = true;
       return true;
     }
@@ -216,7 +240,7 @@ private:
   };
 
   std::array<Segment, 2> segments{};
-  bool prepared = false;
+  bool initialized = false, prepared = false;
 
   template <class DerivFunc>
   double3

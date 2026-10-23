@@ -31,9 +31,9 @@ struct StepperDopr5 {
 
   struct Event {
     EventFunc func;
-    double x;
-    int sign;
-    bool active;
+    double x = 0;
+    int sign = 0;
+    bool active = false;
   };
 
   std::vector<Event> events;

@@ -81,12 +81,12 @@ test_constant_and_cache() {
         ++calls;
         return {frequency, 0, 0};
       };
-      using Stepper = StepperMagnus<decltype(omega)>;
+      using Stepper = StepperMagnus;
       static_assert(
           !std::is_constructible_v<Stepper, decltype(omega)&&, double, double>);
-      Stepper stepper(omega, 1e-10, 1e-10);
-      stepper.init(3, 2, 5, initial);
-      require(stepper.do_step(), "Constant step accepted");
+      Stepper stepper(1e-10, 1e-10);
+      stepper.init(3, 5, 2, initial);
+      require(stepper.do_step(omega), "Constant step accepted");
       require(calls == 9,
               "Six trial Gauss samples and three accepted endpoints");
       callable = false;
@@ -106,7 +106,7 @@ test_constant_and_cache() {
       near(distance(stepper.dense_out(std::nextafter(4.0, 5.0)), midpoint), 0,
            2e-12, "Continuous right midpoint limit");
       require(calls == 9, "Queries reuse cached coefficients");
-      throws<std::logic_error>([&] { stepper.do_step(); },
+      throws<std::logic_error>([&] { stepper.do_step(omega); },
                                "Uncommitted step guard");
       auto final = stepper.y_new;
       stepper.update_old();
@@ -114,7 +114,7 @@ test_constant_and_cache() {
       require(stepper.x_old == 5, "Commit exact interval endpoint");
       throws<std::logic_error>([&] { stepper.dense_out(4); },
                                "Invalidate committed cache");
-      require(!stepper.do_step(), "Completed interval returns false");
+      require(!stepper.do_step(omega), "Completed interval returns false");
     }
   }
   auto x = Rotation::exponential({0.3, 0, 0});
@@ -131,11 +131,11 @@ test_convergence() {
   double previous = 0;
   for (int n : {4, 8, 16, 32}) {
     // Loose tolerances and an explicit cap isolate the discretization order.
-    StepperMagnus stepper(omega, 1., 0.);
+    StepperMagnus stepper(1., 0.);
     double h = 1.0 / n;
-    stepper.init(0, h, 1, initial);
+    stepper.init(0, 1, h, initial);
     int steps = 0;
-    while (stepper.do_step(h)) {
+    while (stepper.do_step(omega, h)) {
       require(stepper.h_old == h, "Fixed convergence step");
       stepper.update_old();
       ++steps;
@@ -152,9 +152,9 @@ test_convergence() {
   previous = 0;
   for (double h : {0.4, 0.2, 0.1, 0.05}) {
     double start = 0.2;
-    StepperMagnus stepper(omega, 1., 0.);
-    stepper.init(start, h, start + h, omega.exact(start, initial));
-    require(stepper.do_step(), "Local convergence step");
+    StepperMagnus stepper(1., 0.);
+    stepper.init(start, start + h, h, omega.exact(start, initial));
+    require(stepper.do_step(omega), "Local convergence step");
     double error = 0;
     for (double t : {0.13, 0.37, 0.63, 0.87}) {
       double x = std::lerp(stepper.x_old, stepper.x_new, t);
@@ -185,9 +185,9 @@ test_adaptation_and_intervals() {
       require(x >= 0 && x <= 2, "Rejected trials stay in interval");
       return model(x);
     };
-    StepperMagnus stepper(omega, tolerance, tolerance);
+    StepperMagnus stepper(tolerance, tolerance);
     stepper.init(0, 2, 2, initial);
-    require(stepper.do_step(), "Adaptive step accepted");
+    require(stepper.do_step(omega), "Adaptive step accepted");
     require(calls > 9 && (calls - 3) % 6 == 0,
             "Rejected trials skip dense endpoints");
     require(stepper.h_old < 2, "Rejection reduces step");
@@ -200,7 +200,7 @@ test_adaptation_and_intervals() {
     };
     check_error();
     stepper.update_old();
-    while (stepper.do_step()) {
+    while (stepper.do_step(omega)) {
       check_error();
       stepper.update_old();
       require(++steps < 10000, "Adaptive termination");
@@ -221,14 +221,14 @@ test_adaptation_and_intervals() {
     require(x >= left && x <= right, "Callback outside current outer interval");
     return {0, 0, 2};
   };
-  StepperMagnus stepper(omega, 1e-10, 1e-10);
+  StepperMagnus stepper(1e-10, 1e-10);
   Stokes state{1, 0, 0};
   double suggested = 10;
   for (double end : {0.7, 1.03, 1.87}) {
     right = end;
-    stepper.init(left, suggested, right, state);
+    stepper.init(left, right, suggested, state);
     int count = 0;
-    while (stepper.do_step(0.2)) {
+    while (stepper.do_step(omega, 0.2)) {
       require(stepper.h_old <= 0.2 && stepper.x_new <= right,
               "Step capped by both bounds");
       stepper.update_old();
@@ -243,11 +243,11 @@ test_adaptation_and_intervals() {
   }
 
   // No accidental normalization, and zero state works with relative-only error.
-  StepperMagnus zero(omega, 0., 1e-8);
+  StepperMagnus zero(0., 1e-8);
   left = 0;
   right = 1;
   zero.init(0, 1, 1, {});
-  require(zero.do_step(), "Zero state with relative-only tolerance");
+  require(zero.do_step(omega), "Zero state with relative-only tolerance");
   same(zero.y_new, {}, "Zero state remains zero");
 }
 
@@ -261,22 +261,22 @@ test_invalid_and_lifecycle() {
         std::array{nan, 1.}, std::array{1., nan}, std::array{inf, 1.},
         std::array{1., inf}})
     throws<std::invalid_argument>(
-        [&] { StepperMagnus s(omega, tolerances[0], tolerances[1]); },
+        [&] { StepperMagnus s(tolerances[0], tolerances[1]); },
         "Reject invalid tolerances");
-  StepperMagnus stepper(omega, 1e-8, 0.);
-  throws<std::logic_error>([&] { stepper.do_step(); },
+  StepperMagnus stepper(1e-8, 0.);
+  throws<std::logic_error>([&] { stepper.do_step(omega); },
                            "Require initialization");
   throws<std::logic_error>([&] { stepper.dense_out(0); },
                            "No cache before initialization");
   throws<std::logic_error>([&] { stepper.update_old(); }, "No state to commit");
   for (double h : {0., -1., nan, inf})
-    throws<std::invalid_argument>([&] { stepper.init(0, h, 1, {}); },
+    throws<std::invalid_argument>([&] { stepper.init(0, 1, h, {}); },
                                   "Reject invalid initial step");
   for (auto bounds :
        {std::array{1., 0.}, std::array{nan, 1.}, std::array{0., nan},
         std::array{-inf, 0.}, std::array{0., inf}})
     throws<std::invalid_argument>(
-        [&] { stepper.init(bounds[0], 1, bounds[1], {}); },
+        [&] { stepper.init(bounds[0], bounds[1], 1, {}); },
         "Reject invalid interval");
   for (Stokes s : {Stokes{nan, 0, 0}, Stokes{0, inf, 0}, Stokes{0, 0, -inf}})
     throws<std::invalid_argument>([&] { stepper.init(0, 1, 1, s); },
@@ -285,31 +285,31 @@ test_invalid_and_lifecycle() {
   throws<std::logic_error>([&] { stepper.dense_out(0); },
                            "No cache before acceptance");
   for (double h : {0., -1., nan})
-    throws<std::invalid_argument>([&] { stepper.do_step(h); },
+    throws<std::invalid_argument>([&] { stepper.do_step(omega, h); },
                                   "Reject invalid maximum step");
-  require(stepper.do_step(), "Valid state after invalid maximum step");
+  require(stepper.do_step(omega), "Valid state after invalid maximum step");
   for (double x : {-1., std::nextafter(1., 2.), nan, inf})
     throws<std::out_of_range>([&] { stepper.dense_out(x); },
                               "Reject dense extrapolation");
-  stepper.init(2, 1, 2, {0.2, 0.3, 0.4});
-  require(!stepper.do_step(), "Empty interval");
+  stepper.init(2, 2, 1, {0.2, 0.3, 0.4});
+  require(!stepper.do_step(omega), "Empty interval");
   same(stepper.y_old, {0.2, 0.3, 0.4},
        "Empty interval preserves initial state");
   throws<std::logic_error>([&] { stepper.dense_out(0.5); },
                            "Reinit discards previous cache");
-  stepper.init(1, 1, std::nextafter(1., 2.), {});
-  throws<std::runtime_error>([&] { stepper.do_step(); },
+  stepper.init(1, std::nextafter(1., 2.), 1, {});
+  throws<std::runtime_error>([&] { stepper.do_step(omega); },
                              "Unrepresentable half steps");
-  stepper.init(1, 1e-30, 2, {});
-  throws<std::runtime_error>([&] { stepper.do_step(); }, "Step underflow");
+  stepper.init(1, 2, 1e-30, {});
+  throws<std::runtime_error>([&] { stepper.do_step(omega); }, "Step underflow");
   for (bool endpoints_only : {false, true}) {
     auto bad = [&](double x) -> double3 {
       return (!endpoints_only || x == 0) ? double3{nan, 0, 0}
                                          : double3{0, 0, 1};
     };
-    StepperMagnus broken(bad, 1e-8, 0.);
+    StepperMagnus broken(1e-8, 0.);
     broken.init(0, 1, 1, {1, 0, 0});
-    throws<std::runtime_error>([&] { broken.do_step(); },
+    throws<std::runtime_error>([&] { broken.do_step(bad); },
                                "Reject nonfinite generator");
     throws<std::logic_error>([&] { broken.dense_out(0.5); },
                              "Failed trial exposes no cache");
@@ -347,7 +347,7 @@ test_nested_optical_depth() {
     ++coefficient_calls;
     return {0, 0, 1};
   };
-  StepperMagnus polarization(omega, 1e-10, 1e-10);
+  StepperMagnus polarization(1e-10, 1e-10);
   Stokes state{1, 0, 0};
   double h_pol = 0.003, accumulated = 0;
   constexpr double event = 0.37;
@@ -357,8 +357,8 @@ test_nested_optical_depth() {
     require(!absorbed, "Outward radial test ray is not absorbed");
     left = geodesic.l_old();
     right = geodesic.l_new();
-    polarization.init(left, h_pol, right, state);
-    while (polarization.do_step(0.04)) {
+    polarization.init(left, right, h_pol, state);
+    while (polarization.do_step(omega, 0.04)) {
       ++pol_steps;
       int cached_calls = coefficient_calls;
       auto opacity = [&](double l) {

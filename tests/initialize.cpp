@@ -75,7 +75,9 @@ check_geometry(InitializedPhoton const& p) {
   require(p.r0 == R_star && p.psi0 == 0, "Starts at stellar surface, psi = 0");
   require(std::isfinite(p.alpha0) && p.alpha0 >= 0 && p.alpha0 <= pi / 2,
           "Outward emission angle");
-  require(p.pol == Polarization::E || p.pol == Polarization::O, "Valid mode");
+  require(p.pol == AdiabaticPolarization::E ||
+              p.pol == AdiabaticPolarization::O,
+          "Valid mode");
   near(p.e1.length(), 1, 1e-12, "Unit e1");
   near(p.e2.length(), 1, 1e-12, "Unit e2");
   near(p.n.length(), 1, 1e-12, "Unit plane normal");
@@ -104,7 +106,7 @@ planck_cdf(double upper) {
 }
 
 void
-test_distribution(InitialPhotonOptions const& options, unsigned long long seed,
+test_distribution(InitFD11::Options const& options, unsigned long long seed,
                   std::string_view name) {
   constexpr int count = 200000;
   constexpr std::array energy_edges{0.5, 1.0, 3.0, 10.0};
@@ -118,7 +120,7 @@ test_distribution(InitialPhotonOptions const& options, unsigned long long seed,
   double cap_area = 1 - std::cos(options.cap_half_angle);
   Ran ran(seed);
   for (int i = 0; i < count; ++i) {
-    auto p = sample_initial_photon_fd11(ran, rs, R_star, T_inf, options);
+    auto p = InitFD11(R_star, T_inf, options).sample_initial_photon(ran);
     check_geometry(p);
     double area = (1 - std::abs(p.e1.z)) / cap_area;
     require(area >= -1e-12 && area <= 1 + 1e-12,
@@ -130,7 +132,7 @@ test_distribution(InitialPhotonOptions const& options, unsigned long long seed,
     sum_x += x;
     sum_x2 += x * x;
     north += p.e1.z > 0;
-    e_mode += p.pol == Polarization::E;
+    e_mode += p.pol == AdiabaticPolarization::E;
     for (std::size_t j = 0; j < energy_edges.size(); ++j)
       energy_hits[j] += x <= energy_edges[j];
     for (std::size_t j = 0; j < area_edges.size(); ++j) {
@@ -181,7 +183,7 @@ test_distribution(InitialPhotonOptions const& options, unsigned long long seed,
 
 void
 test_boundaries_and_geodesic() {
-  std::array<InitialPhotonOptions, 5> configurations{{
+  std::array<InitFD11::Options, 5> configurations{{
       {},
       {5 * pi / 180, 0, 0},
       {5 * pi / 180, 1, 1},
@@ -193,13 +195,13 @@ test_boundaries_and_geodesic() {
   Geodesic geodesic(M_star, R_star);
   for (auto const& options : configurations) {
     for (int i = 0; i < 128; ++i) {
-      auto p = sample_initial_photon_fd11(ran, rs, R_star, T_inf, options);
+      auto p = InitFD11(R_star, T_inf, options).sample_initial_photon(ran);
       check_geometry(p);
       require(options.north_fraction != 0 || p.e1.z < 0, "South cap endpoint");
       require(options.north_fraction != 1 || p.e1.z > 0, "North cap endpoint");
-      require(options.e_mode_fraction != 0 || p.pol == Polarization::O,
+      require(options.e_mode_fraction != 0 || p.pol == AdiabaticPolarization::O,
               "Pure O endpoint");
-      require(options.e_mode_fraction != 1 || p.pol == Polarization::E,
+      require(options.e_mode_fraction != 1 || p.pol == AdiabaticPolarization::E,
               "Pure E endpoint");
       geodesic.init(p.r0, p.psi0, p.alpha0);
       require(!geodesic.step(), "No spurious surface absorption on emission");
@@ -219,22 +221,18 @@ test_boundaries_and_geodesic() {
 
 void
 test_reproducibility_and_scaling() {
-  Ran base(182), repeat(182), hot(182), flat(182), compact(182);
+  Ran base(182), repeat(182), hot(182);
   for (int i = 0; i < 128; ++i) {
-    auto a = sample_initial_photon_fd11(base, rs, R_star, T_inf);
-    for (auto b : {sample_initial_photon_fd11(repeat, rs, R_star, T_inf),
-                   sample_initial_photon_fd11(flat, 0, R_star, T_inf),
-                   sample_initial_photon_fd11(
-                       compact, std::nextafter(R_star, 0), R_star, T_inf)}) {
-      same_geometry_and_mode(a, b);
-      require(a.omega_inf == b.omega_inf,
-              "Reproducible energy independent of rs");
-    }
-    auto b = sample_initial_photon_fd11(hot, rs, R_star, 2 * T_inf);
+    auto a = InitFD11(R_star, T_inf).sample_initial_photon(base);
+    auto b = InitFD11(R_star, T_inf).sample_initial_photon(repeat);
+    same_geometry_and_mode(a, b);
+    require(a.omega_inf == b.omega_inf, "Reproducible energy");
+    b = InitFD11(R_star, 2 * T_inf).sample_initial_photon(hot);
     same_geometry_and_mode(a, b);
     require(b.omega_inf == 2 * a.omega_inf,
             "Energy scales linearly with T_inf");
   }
+  // InitFD11 has no rs argument: it samples the conserved energy directly.
 }
 
 template <class Exception, class F>
@@ -253,28 +251,25 @@ test_invalid_parameters() {
   double nan = std::numeric_limits<double>::quiet_NaN();
   double inf = std::numeric_limits<double>::infinity();
   Ran ran(771), original = ran;
-  auto invalid = [&](double radius_s, double radius, double temperature,
-                     InitialPhotonOptions options = {}) {
+  auto invalid = [&](double radius, double temperature,
+                     InitFD11::Options options = {}) {
     expect_throw<std::invalid_argument>(
         [&] {
-          sample_initial_photon_fd11(ran, radius_s, radius, temperature,
-                                     options);
+          InitFD11(radius, temperature, options).sample_initial_photon(ran);
         },
         "Invalid photon parameters must throw invalid_argument");
     require(ran.u == original.u && ran.v == original.v && ran.w == original.w,
             "Invalid parameters must not consume random numbers");
   };
   for (double value : {-1.0, 0.0, inf, -inf, nan}) {
-    invalid(rs, value, T_inf);
-    invalid(rs, R_star, value);
+    invalid(value, T_inf);
+    invalid(R_star, value);
   }
-  for (double value : {-1.0, R_star, 2 * R_star, inf, -inf, nan})
-    invalid(value, R_star, T_inf);
   for (double value : {-1.0, 0.0, std::nextafter(pi / 2, inf), inf, -inf, nan})
-    invalid(rs, R_star, T_inf, {.cap_half_angle = value});
+    invalid(R_star, T_inf, {.cap_half_angle = value});
   for (double value : {-0.1, std::nextafter(1.0, inf), inf, -inf, nan}) {
-    invalid(rs, R_star, T_inf, {.north_fraction = value});
-    invalid(rs, R_star, T_inf, {.e_mode_fraction = value});
+    invalid(R_star, T_inf, {.north_fraction = value});
+    invalid(R_star, T_inf, {.e_mode_fraction = value});
   }
 }
 
@@ -288,10 +283,12 @@ test_random_endpoints_and_energy_range() {
     ran.v = upper ? 9259612767413907632ULL : 0;
     ran.w = 0;
     Ran probe = ran, photon_rng = ran;
-    require(probe.U() == (upper ? 1.0 : 0.0), "Random endpoint fixture");
-    double u = initialize_fd11_detail::open_unit(ran);
+    require(probe.uint64() ==
+                (upper ? std::numeric_limits<unsigned long long>::max() : 0),
+            "Random endpoint fixture");
+    double u = ran.U();
     require(u > 0 && u < 1, "Redraw random endpoints");
-    check_geometry(sample_initial_photon_fd11(photon_rng, rs, R_star, T_inf));
+    check_geometry(InitFD11(R_star, T_inf).sample_initial_photon(photon_rng));
   }
 
   for (double temperature : {std::numeric_limits<double>::max(),
@@ -301,7 +298,7 @@ test_random_endpoints_and_energy_range() {
     for (int i = 0; i < 2000; ++i) {
       InitializedPhoton p;
       try {
-        p = sample_initial_photon_fd11(ran, rs, R_star, temperature);
+        p = InitFD11(R_star, temperature).sample_initial_photon(ran);
       } catch (std::runtime_error const&) {
         ++unrepresentable;
         continue;

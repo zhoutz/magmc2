@@ -11,7 +11,7 @@ f(double x) {
 int
 main() {
   double a = 0, b = 1;
-  // double root = bisect_root(f, a, b, 0, f(a), f(b));
-  double root = ridders_root(f, a, b, 0, f(a), f(b));
+  // double root = bisect_root(f, a, b, f(a), f(b));
+  double root = ridders_root(f, a, b, f(a), f(b));
   std::print("Root: {}\n", root);
 }
