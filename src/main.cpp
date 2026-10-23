@@ -123,9 +123,7 @@ struct PhotonEvolution {
         };
         while (stokes_stepper.do_step(omega)) {
           // 在 [x_old, x_new] 内积分散射光深。
-          // 任意采样点 l：
-          //   geometry = geodesic.interp(l);
-          //   S = stokes_stepper.dense_out(l);
+          
           // 若发生散射，在此定位、读取状态并退出。
           stokes_stepper.update_old();
         }

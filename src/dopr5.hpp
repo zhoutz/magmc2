@@ -252,7 +252,7 @@ struct StepperDopr5 {
         if (event.active) {
           event.x = bisect_root(
               [&](double x) { return event.func(x, dense_out(x)); }, x_old,
-              x_new, 0, event.func(x_old, y_old), event.func(x_new, y_new));
+              x_new, event.func(x_old, y_old), event.func(x_new, y_new));
         }
       }
 
