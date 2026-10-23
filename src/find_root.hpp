@@ -8,8 +8,8 @@
 
 template <class F>
 double
-bisect_root(F const& func, double x1, double x2, double xacc, double f1,
-            double f2) {
+bisect_root(F const& func, double x1, double x2, double f1, double f2,
+            double xacc = 0) {
   if (xacc < 0)
     throw std::invalid_argument("xacc must be non-negative");
   if (std::isnan(f1) || std::isnan(f2))
@@ -47,8 +47,8 @@ bisect_root(F const& func, double x1, double x2, double xacc, double f1,
 
 template <class F>
 double
-ridders_root(F const& func, double x1, double x2, double xacc, double f1,
-             double f2) {
+ridders_root(F const& func, double x1, double x2, double f1, double f2,
+             double xacc = 0) {
   if (xacc < 0)
     throw std::invalid_argument("xacc must be non-negative");
   if (std::isnan(f1) || std::isnan(f2))

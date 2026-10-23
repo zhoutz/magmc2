@@ -5,6 +5,7 @@
 #include "polarization.hpp"
 #include "ran.hpp"
 #include <cmath>
+#include <concepts>
 #include <stdexcept>
 
 struct InitializedPhoton {

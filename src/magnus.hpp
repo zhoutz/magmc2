@@ -42,21 +42,19 @@ struct Rotation {
 // Tolerances control the endpoint step-doubling estimate, NOT an independent
 // dense error estimate. Fourth-order accuracy requires smooth coefficients.
 // Only the latest accepted step is cached; dense queries never call derivs.
-template <class DerivFunc>
 struct StepperMagnus {
-  DerivFunc const& derivs;
   double x_old = 0, x_new = 0, x_max = 0;
   double h_old = 0, h_new = 0;
   Stokes y_old{}, y_new{};
   double atol, rtol;
 
-  StepperMagnus(DerivFunc const& derivs, double atol = 1e-6, double rtol = 1e-6)
-      : derivs(derivs), atol(atol), rtol(rtol) {
+  StepperMagnus(double atol = 1e-6, double rtol = 1e-6)
+      : atol(atol), rtol(rtol) {
     validate_tolerances();
   }
 
   void
-  init(double x_init, double h_init, double x_end, Stokes const& y_init) {
+  init(double x_init, double x_end, double h_init, Stokes const& y_init) {
     if (!(std::isfinite(h_init) && h_init > 0))
       throw std::invalid_argument("h_init must be positive and finite");
     if (!std::isfinite(x_init) || !std::isfinite(x_end) || x_end < x_init ||
@@ -73,8 +71,9 @@ struct StepperMagnus {
 
   // Inspect/integrate optical depth using dense_out before update_old().
   // false means the initialized interval has been completely committed.
+  template <class DerivFunc>
   bool
-  do_step() {
+  do_step(DerivFunc const& derivs) {
     if (prepared)
       throw std::logic_error(
           "StepperMagnus requires update_old() before stepping");
@@ -93,8 +92,9 @@ struct StepperMagnus {
       if (!(x_old < mid && mid < end))
         throw std::runtime_error("Stepsize underflow in StepperMagnus");
       double h = end - x_old;
-      Segment whole = sample(x_old, end);
-      Segment first = sample(x_old, mid), second = sample(mid, end);
+      Segment whole = sample(derivs, x_old, end);
+      Segment first = sample(derivs, x_old, mid),
+              second = sample(derivs, mid, end);
       first.before = y_old;
       first.after = second.before = first.rotation.apply(y_old);
       second.after = second.rotation.apply(first.after);
@@ -116,9 +116,9 @@ struct StepperMagnus {
 
       // Reuse the four accepted Gauss samples; only three new endpoint
       // evaluations are needed because the two halves share their midpoint.
-      first.omega[0] = coefficient(x_old);
-      first.omega[3] = second.omega[0] = coefficient(mid);
-      second.omega[3] = coefficient(end);
+      first.omega[0] = coefficient(derivs, x_old);
+      first.omega[3] = second.omega[0] = coefficient(derivs, mid);
+      second.omega[3] = coefficient(derivs, end);
       segments = {first, second};
       x_new = end;
       h_old = h;
@@ -218,21 +218,23 @@ private:
   std::array<Segment, 2> segments{};
   bool prepared = false;
 
+  template <class DerivFunc>
   double3
-  coefficient(double x) const {
+  coefficient(DerivFunc const& derivs, double x) const {
     auto w = derivs(x);
     if (!finite(w))
       throw std::runtime_error("Non-finite generator in StepperMagnus");
     return w;
   }
 
+  template <class DerivFunc>
   Segment
-  sample(double begin, double end) const {
+  sample(DerivFunc const& derivs, double begin, double end) const {
     Segment segment;
     segment.begin = begin;
     segment.end = end;
     for (int i : {1, 2})
-      segment.omega[i] = coefficient(std::lerp(begin, end, nodes[i]));
+      segment.omega[i] = coefficient(derivs, std::lerp(begin, end, nodes[i]));
     segment.rotation =
         magnus_rotation(segment.omega[1], segment.omega[2], end - begin);
     return segment;
