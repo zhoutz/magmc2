@@ -100,15 +100,18 @@ struct PhotonEvolution {
 
   void
   init() {
-    InitializedPhoton photon = initializer.sample_initial_photon(ran);
+    init(initializer.sample_initial_photon(ran));
+  }
+  void
+  init(InitializedPhoton const& photon) {
     geodesic.init(photon.r0, photon.psi0, photon.alpha0);
     n = photon.n;
     e1 = photon.e1;
     e2 = photon.e2;
     omega_inf = photon.omega_inf;
-    is_adiabatic = true;
     apol = photon.pol;
     tau = std::log(ran.U());
+    is_adiabatic = true;
   }
 
   static
@@ -356,8 +359,8 @@ struct PhotonEvolution {
           return EvolveResult::Scattered;
       } else {
         StepperMagnus stepper;
-        stepper.init(geodesic.l_old(), geodesic.l_new(), 0.1 * geodesic.l_old(),
-                     stokes);
+        stepper.init(geodesic.l_old(), geodesic.l_new(),
+                     0.1 * (geodesic.l_new() - geodesic.l_old()), stokes);
         auto omega = [&](double l) { return get_basis(l).omega; };
         while (stepper.do_step(omega)) {
           if (integrate_scattering(stepper.x_old, stepper.x_new, [&](double l) {
@@ -410,8 +413,14 @@ struct PhotonEvolution {
     double energy = omega_inf * (1 - beta * b.mu) / (1 - beta * mu_out);
     auto mode = ran.U() < 1 / (1 + mup * mup) ? AdiabaticPolarization::E
                                               : AdiabaticPolarization::O;
-    init({normal, b.r_hat, cross(normal, b.r_hat), energy, b.r, 0,
-          std::atan2(cross_len, dot(k, b.r_hat)), mode});
+    init(InitializedPhoton{.n = normal,
+                           .e1 = b.r_hat,
+                           .e2 = cross(normal, b.r_hat),
+                           .omega_inf = energy,
+                           .r0 = b.r,
+                           .psi0 = 0,
+                           .alpha0 = std::atan2(cross_len, dot(k, b.r_hat)),
+                           .pol = mode});
   }
 };
 
@@ -425,11 +434,22 @@ main() {
   InitFD11 initializer(R_star, T_inf);
   auto powerlaw_electron = CurrentComponent{.dist = PowerLaw2(0.2, 0.8),
                                             .charge_sign = -1,
-                                            .current_fraction = 0.5,
+                                            .current_fraction = 1.0,
                                             .charge_mass_ratio = 1.0};
 
-  PhotonEvolution photon_evolution(M_star, R_star, 42, bfield, initializer,
-                                   powerlaw_electron);
-  photon_evolution.init();
-  photon_evolution.evolve();
+  PhotonEvolution photon(M_star, R_star, 42, bfield, initializer,
+                         powerlaw_electron);
+  photon.init();
+  auto result = photon.evolve();
+  if (result == decltype(photon)::EvolveResult::Scattered) {
+    std::println("Scattered: beta={} tau={}", photon.scattered_data.beta,
+                 photon.tau);
+    photon.perform_scattering();
+  } else if (result == decltype(photon)::EvolveResult::Escaped) {
+    auto const& e = photon.escaped_data;
+    std::println("Escaped: omega_inf={} muk={} Q={} U={} V={}", e.omega_inf,
+                 e.muk, e.Q, e.U, e.V);
+  } else {
+    std::println("Absorbed");
+  }
 }
