@@ -22,7 +22,7 @@ struct Basis {
                         : double3{std::copysign(1.0, mu), 0, 0};
     phi_hat =
         rho > 0 ? double3{-r_hat.y / rho, r_hat.x / rho, 0} : double3{0, 1, 0};
-    auto [B_vec, twist] = bfield.B_and_twist(r, mu);
+    auto [B_vec, _] = bfield.B_and_twist(r, mu);
     B = B_vec.x * r_hat + B_vec.y * theta_hat + B_vec.z * phi_hat;
   }
 };

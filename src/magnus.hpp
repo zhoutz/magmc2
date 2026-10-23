@@ -29,7 +29,38 @@ struct Rotation {
   }
 };
 
-template <class F>
+
+
+
+
+
+template <class DerivFunc>
+struct StepperMagnus {
+  static constexpr double EPS = std::numeric_limits<double>::epsilon();
+  
+  DerivFunc const& derivs;
+  double x_old, h_old, x_max;
+  // double3 y_old, y_new, y_err;
+  double atol, rtol;
+
+  StepperMagnus(DerivFunc const& derivs, double atol, double rtol)
+      : derivs(derivs), atol(atol), rtol(rtol) {}
+
+
+  void
+  init(double x_init, double h_init, double x_end, double3 const& y_init) {
+    if (!(std::isfinite(h_init) && h_init > 0)) {
+      throw std::invalid_argument("h_init must be positive and finite");
+    }
+    x_old = x_init;
+    h_old = h_init;
+    x_max = x_end;
+    // y_old = y_init;
+    // derivs(x_old, y_old, dydx_old);
+    
+  }
+
+  template <class F>
 Rotation
 magnus(F const& omega, double x, double h) {
   constexpr double g = 0.28867513459481288225;
@@ -39,3 +70,38 @@ magnus(F const& omega, double x, double h) {
   auto second = Rotation::exponential(h * (b * c1.omega() + a * c2.omega()));
   return Rotation::compose(second, first);
 }
+
+  void
+  do_step() {
+    h_old = std::min(h_old, max_step);
+    while (true) {
+      if (std::abs(h_old) <= std::abs(x_old) * EPS) {
+        throw std::runtime_error("stepsize underflow in StepperDopr5");
+      }
+      try_step();
+      if (success(error()))
+        break;
+    }
+    prepare_dense();
+  }
+
+  void
+  update_old() {
+    dydx_old = dydx_new;
+    y_old = y_new;
+    x_old += h_old;
+    h_old = h_new;
+  }
+
+
+  void
+  prepare_dense() {
+    
+  }
+
+  double3
+  dense_out(double x) const {
+    
+  }
+
+};
