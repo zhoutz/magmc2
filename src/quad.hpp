@@ -2,9 +2,9 @@
 
 #include <cmath>
 #include <cstdlib>
+#include <format>
 #include <gsl/gsl_errno.h>
 #include <gsl/gsl_integration.h>
-#include <print>
 
 struct Quad {
   static constexpr size_t limit = 8192;
@@ -23,11 +23,10 @@ struct Quad {
                                       workspace, &result, &abserr);
 
     if (!std::isfinite(result) || !std::isfinite(abserr)) {
-      std::println(
-          stderr, "qags failed: {} (status={}, result={}, abserr={})\n",
+      throw std::runtime_error(std::format(
+          "qags failed: {} (status={}, result={}, abserr={})\n",
           status == GSL_SUCCESS ? "non-finite output" : gsl_strerror(status),
-          status, result, abserr);
-      std::abort();
+          status, result, abserr));
     }
     return result;
   }
