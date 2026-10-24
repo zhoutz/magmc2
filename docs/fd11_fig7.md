@@ -1,5 +1,10 @@
 # FD11 Figure 7
 
+For the optional local-interpolation solver and deterministic multi-threaded
+runner (`--fast --threads 8`), see [performance_fast.md](performance_fast.md).
+That report separates numerical speedup from parallel speedup and records
+the output differences; the commands below retain the conservative settings.
+
 This calculation uses the existing C++ transport, scattering and polarization
 solvers to reproduce the `t10_g20_c90_Eu` model in Fernández & Davis (2011),
 *ApJ* 730:131, Figure 7 (PDF page 10), Table 1 and Sections 3.4–4.1.

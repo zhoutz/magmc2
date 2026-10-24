@@ -44,6 +44,21 @@ struct Geodesic {
     return stepper.dense_out(l);
   }
 
+  // Enclose the entire dense polynomial, including an inward turning point.
+  // Each nested factor s or 1-s is in [0,1]; endpoint radii alone do not bound it.
+  std::pair<double, double>
+  radius_bounds() const {
+    double lo = 0, hi = 0;
+    for (double c : {stepper.rcont5[0], stepper.rcont4[0],
+                     stepper.rcont3[0], stepper.rcont2[0]}) {
+      lo = std::min(0.0, lo + c);
+      hi = std::max(0.0, hi + c);
+    }
+    double pad = 1e-10 * std::max(1.0, std::abs(stepper.rcont1[0]) +
+                                           std::max(std::abs(lo), std::abs(hi)));
+    return {stepper.rcont1[0] + lo - pad, stepper.rcont1[0] + hi + pad};
+  }
+
   void
   operator()(double, YVector const& y, YVector& dydx) const {
     auto [r, psi, alpha] = y;

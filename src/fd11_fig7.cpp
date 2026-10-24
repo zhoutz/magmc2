@@ -1,11 +1,15 @@
 #include "bfield.hpp"
 #include "component.hpp"
 #include "evolution.hpp"
+#include "photon_stream.hpp"
 #include <charconv>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
+#include <memory>
+#include <omp.h>
+#include <print>
 #include <string_view>
 
 // PhotonEvolution evaluates dist.f(charge_sign * beta). FD11's electrons
@@ -25,6 +29,8 @@ struct Arguments {
   std::string output = "data/fd11_fig7_photons.txt";
   std::string field = "table/bfield_t10.txt";
   bool tight = false;
+  bool fast = false, photon_streams = false;
+  int threads = 1;
 };
 
 template <class T>
@@ -42,9 +48,12 @@ Arguments parse(int argc, char** argv) {
     std::string_view key(argv[i]);
     if (key == "--help") {
       std::println("Usage: fd11_fig7 [--photons N] [--seed N] [--output FILE]"
-                   " [--field FILE] [--tight]\n"
+                   " [--field FILE] [--tight] [--fast] [--threads N] [--photon-streams]\n"
                    "N counts emitted photons, including those later absorbed.\n"
                    "--tight tightens coupling, escape and quadrature tolerances.\n"
+                   "--fast enables validated local interpolation and cheaper optical-depth settings.\n"
+                   "--threads N uses N workers and stable per-photon random streams.\n"
+                   "--photon-streams uses the same random streams with one worker for comparisons.\n"
                    "Run from the repository root or supply --field.");
       std::exit(0);
     }
@@ -52,6 +61,8 @@ Arguments parse(int argc, char** argv) {
       args.tight = true;
       continue;
     }
+    if (key == "--fast") { args.fast = true; continue; }
+    if (key == "--photon-streams") { args.photon_streams = true; continue; }
     if (i + 1 == argc)
       throw std::invalid_argument("Missing value for " + std::string(key));
     std::string_view value(argv[++i]);
@@ -59,8 +70,11 @@ Arguments parse(int argc, char** argv) {
     else if (key == "--seed") args.seed = integer<int>(value);
     else if (key == "--output") args.output = value;
     else if (key == "--field") args.field = value;
+    else if (key == "--threads") args.threads = integer<int>(value);
     else throw std::invalid_argument("Unknown argument: " + std::string(key));
   }
+  if (args.threads > 256) throw std::invalid_argument("At most 256 workers supported");
+  if (args.threads > 1) args.photon_streams = true;
   return args;
 }
 } // namespace
@@ -80,14 +94,33 @@ int main(int argc, char** argv) {
                                .current_fraction = 1.0, .charge_mass_ratio = 1.0};
     using Evolution = PhotonEvolution<InitFD11, decltype(electrons)>;
     Evolution::Options options;
+    if (args.fast) {
+      options.quad_atol = 1e-6;
+      options.quad_rtol = 1e-5;
+      options.n_knots = 2;
+      options.cache_tolerance = 1e-7;
+      options.event_rtol = 1e-7;
+    }
     if (args.tight) {
       options.eta_couple = 3e-4;
       options.escape_tolerance = 3e-4;
       options.quad_atol = options.quad_rtol = 1e-9;
       options.n_scan = 16;
+      if (args.fast) {
+        options.quad_atol = 1e-8;
+        options.quad_rtol = 1e-7;
+        options.n_knots = 8;
+        options.cache_tolerance = 1e-9;
+        options.event_rtol = 1e-9;
+      }
     }
-    Evolution photon(mass, R, args.seed, field, initializer, electrons, options);
-    for (double beta : photon.knots)
+    // Construct on the main thread: Quad sets GSL's global error handler.
+    // Each worker owns its RNG, integrators and mutable interpolation cache.
+    std::vector<std::unique_ptr<Evolution>> workers;
+    for (int i = 0; i < args.threads; ++i)
+      workers.push_back(std::make_unique<Evolution>(
+          mass, R, args.seed, field, initializer, electrons, options));
+    for (double beta : workers.front()->knots)
       if (!(beta >= 0.2 && beta <= std::sqrt(0.75)))
         throw std::runtime_error("Incorrect electron velocity direction");
 
@@ -121,37 +154,77 @@ int main(int argc, char** argv) {
         << "\n# magnus_atol = 1e-6\n# magnus_rtol = 1e-6"
         << "\n# stokes_basis = projected_magnetic_axis_right_handed_sky"
         << "\n# photon_id energy_keV mu Q U V n_scatter\n";
+    if (args.fast || args.photon_streams)
+      out << "# numeric_mode = " << (args.fast ? "fast_v1" : "reference")
+          << "\n# random_stream = " << (args.photon_streams ? "photon_id_v1" : "legacy")
+          << "\n# cache_tolerance = " << options.cache_tolerance
+          << "\n# event_rtol = " << options.event_rtol << '\n';
     out.flush();
     auto start = std::chrono::steady_clock::now(), last_report = start;
-    for (unsigned long long id = 0; id < args.photons; ++id) {
-      unsigned long long n_scatter = 0;
-      photon.init();
-      while (true) {
-        auto result = photon.evolve();
-        if (result == Evolution::EvolveResult::Scattered) {
-          if (!(photon.scattered_data.beta > 0.2 &&
-                photon.scattered_data.beta < std::sqrt(0.75)))
-            throw std::runtime_error("Scattered electron outside FD11 velocity range");
-          ++n_scatter;
-          ++scatterings;
-          photon.perform_scattering();
-        } else if (result == Evolution::EvolveResult::Escaped) {
-          auto const& e = photon.escaped_data;
-          double norm = std::hypot(e.Q, e.U, e.V);
-          if (!(std::isfinite(e.omega_inf) && e.omega_inf > 0 &&
-                std::isfinite(e.muk) && std::abs(e.muk) <= 1 &&
-                std::isfinite(norm) && std::abs(norm - 1) < 1e-7))
-            throw std::runtime_error("Nonphysical escaped photon");
-          out << id << ' ' << e.omega_inf << ' ' << e.muk << ' ' << e.Q
-              << ' ' << e.U << ' ' << e.V << ' ' << n_scatter << '\n';
-          ++escaped;
-          break;
-        } else {
-          ++absorbed;
-          break;
+    struct Record {
+      Evolution::EscapedData data{};
+      unsigned long long scatterings = 0;
+      bool escaped = false;
+    };
+    constexpr unsigned long long block_size = 2048;
+    std::vector<Record> records(block_size);
+    std::vector<std::exception_ptr> errors(args.threads);
+    for (unsigned long long begin = 0; begin < args.photons;) {
+      int count = static_cast<int>(std::min(block_size, args.photons - begin));
+      #pragma omp parallel for num_threads(args.threads) schedule(dynamic, 4)
+      for (int j = 0; j < count; ++j) {
+        int worker = omp_get_thread_num();
+        if (errors[worker]) continue;
+        try {
+          auto& photon = *workers[worker];
+          auto& record = records[j];
+          record = {};
+          if (args.photon_streams)
+            photon.ran.set_seed(photon_seed(args.seed, begin + j));
+          photon.init();
+          while (true) {
+            auto result = photon.evolve();
+            if (result == Evolution::EvolveResult::Scattered) {
+              if (!(photon.scattered_data.beta > 0.2 &&
+                    photon.scattered_data.beta < std::sqrt(0.75)))
+                throw std::runtime_error("Scattered electron outside FD11 velocity range");
+              ++record.scatterings;
+              photon.perform_scattering();
+            } else if (result == Evolution::EvolveResult::Escaped) {
+              auto const& e = photon.escaped_data;
+              double norm = std::hypot(e.Q, e.U, e.V);
+              if (!(std::isfinite(e.omega_inf) && e.omega_inf > 0 &&
+                    std::isfinite(e.muk) && std::abs(e.muk) <= 1 &&
+                    std::isfinite(norm) && std::abs(norm - 1) < 1e-7))
+                throw std::runtime_error("Nonphysical escaped photon");
+              record.data = e;
+              record.escaped = true;
+              break;
+            } else {
+              break;
+            }
+          }
+        } catch (...) {
+          errors[worker] = std::current_exception();
         }
       }
-      ++emitted;
+      for (auto const& error : errors)
+        if (error) std::rethrow_exception(error);
+      // A single writer emits records in ID order, independent of scheduling.
+      for (int j = 0; j < count; ++j) {
+        auto const& record = records[j];
+        scatterings += record.scatterings;
+        if (record.escaped) {
+          auto const& e = record.data;
+          out << begin + j << ' ' << e.omega_inf << ' ' << e.muk << ' ' << e.Q
+              << ' ' << e.U << ' ' << e.V << ' ' << record.scatterings << '\n';
+          ++escaped;
+        } else {
+          ++absorbed;
+        }
+        ++emitted;
+      }
+      begin += count;
       auto now = std::chrono::steady_clock::now();
       if (now - last_report > std::chrono::seconds(30) || emitted == args.photons) {
         double seconds = std::chrono::duration<double>(now - start).count();

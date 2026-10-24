@@ -8,6 +8,7 @@
 #include "polarization.hpp"
 #include "quad.hpp"
 #include "ran.hpp"
+#include "transport_cache.hpp"
 
 template <PhotonInitializer Init, typename Comp>
 struct PhotonEvolution {
@@ -15,6 +16,8 @@ struct PhotonEvolution {
     double eta_couple = 1e-3, escape_tolerance = 1e-3;
     double quad_atol = 1e-8, quad_rtol = 1e-8;
     int n_knots = 8, n_scan = 8;
+    bool resonance_bounds = true;
+    double cache_tolerance = 0, event_rtol = 0; // Zero retains exact/reference paths.
   } options;
 
   BField const& bfield;
@@ -44,6 +47,11 @@ struct PhotonEvolution {
                                 double(i) / (options.n_knots - 1)));
   }
 
+  struct Transport {
+    double r, c, s, kappa, mu, x_e, twist;
+    double3 omega;
+  };
+  TransportCache cache;
   struct Basis {
     double3 r_hat, psi_hat, k_hat, s1, s2, B, omega;
     double Bperp2, r, c, s, kappa, Bmag, mu, x_e, twist;
@@ -92,12 +100,36 @@ struct PhotonEvolution {
     return basis(y);
   }
 
+  TransportCache::Values sample_transport(double l) const {
+    auto b = get_basis(l);
+    return {b.r, b.mu, b.x_e, b.twist, dot(b.B, b.s1), dot(b.B, b.s2),
+            2.013919e-19 * omega_inf / std::sqrt(1 - geodesic.rs / b.r)};
+  }
+
+  Transport transport_exact(double l) const {
+    auto b = get_basis(l);
+    return {b.r, b.c, b.s, b.kappa, b.mu, b.x_e, b.twist, b.omega};
+  }
+
+  Transport transport(double l) const {
+    if (options.cache_tolerance == 0) return transport_exact(l);
+    auto v = cache.at(l, [&](double x) { return sample_transport(x); });
+    auto [r, mu, x, twist, b1, b2, K] = v;
+    if (!(r > geodesic.rs && x > 0 && twist >= 0)) return transport_exact(l);
+    // Reconstruct the rotation axis from transverse field components rather
+    // than interpolating c/s independently; c*c+s*s remains one.
+    double perp = b1 * b1 + b2 * b2, diff = b1 * b1 - b2 * b2, twice = 2 * b1 * b2;
+    return {r, perp > 0 ? diff / perp : 1, perp > 0 ? twice / perp : 0, K * perp,
+            std::clamp(mu, -1.0, 1.0), x, twist, {K * diff, K * twice, 0}};
+  }
+
   void
   init() {
     init(initializer.sample_initial_photon(ran));
   }
   void
   init(InitializedPhoton const& photon) {
+    cache.leaves.clear();
     geodesic.init(photon.r0, photon.psi0, photon.alpha0);
     n = photon.n;
     e1 = photon.e1;
@@ -144,10 +176,15 @@ struct PhotonEvolution {
 
   Rates
   rates(Basis const& b, Polarization const& pol) const {
-    Rates result{};
-    Stokes sb = pol.in_B(b.c, b.s);
-    double qb = sb.x, v = sb.z;
+    return rates_at(b, [&] { return pol; });
+  }
 
+  // Dense polarization output requires rotations. Most quadrature samples
+  // have no resonant particles, so evaluate it only for an active channel.
+  template <class Geometry, class PolarizationAt>
+  Rates
+  rates_at(Geometry const& b, PolarizationAt const& pol_at) const {
+    Rates result{};
     if (comp.current_fraction == 0 || b.twist == 0)
       return result;
     double x = comp.charge_mass_ratio * b.x_e, D = discriminant(x, b.mu);
@@ -155,11 +192,17 @@ struct PhotonEvolution {
     if (!(D > 0) || !(x > 0))
       return result;
     auto roots = resonance_roots(x, b.mu, D);
+    Stokes sb{};
+    bool have_stokes = false;
     for (int j = 0; j < 2; ++j) {
       double beta = roots[j];
       double f = comp.dist.f(comp.charge_sign * beta);
       if (!(beta > -1 && beta < 1) || f == 0)
         continue;
+      if (!have_stokes) {
+        sb = pol_at().in_B(b.c, b.s);
+        have_stokes = true;
+      }
       double t = (1 - beta) * (1 + beta);
       double mup = std::clamp((b.mu - beta) / (1 - beta * b.mu), -1.0, 1.0);
       // Equivalent to (1-beta*mu)^2(1-beta^2)/abs(mu-beta),
@@ -167,12 +210,41 @@ struct PhotonEvolution {
       double jacobian = x * x * t * std::sqrt(t) / std::sqrt(D);
       double w = comp.current_fraction * (bfield.p + 1) * pi * b.twist *
                  comp.dist.inv_abs_b_mean / b.r * f * jacobian *
-                 overlap(qb, v, mup, comp.charge_sign);
+                 overlap(sb.x, sb.z, mup, comp.charge_sign);
       if (!std::isfinite(w) || w < 0)
         throw std::runtime_error("Invalid differential optical depth");
       result[j] = {j, beta, w};
     }
     return result;
+  }
+
+  bool
+  may_resonate() const {
+    if (comp.current_fraction == 0)
+      return false;
+    if (!options.resonance_bounds)
+      return true;
+    double beta = std::max(std::abs(comp.dist.b_min), std::abs(comp.dist.b_max));
+    if (!(beta < 1 && geodesic.rs >= 0 && bfield.B_pole > 0 && bfield.p > 0 &&
+          comp.charge_mass_ratio > 0 && omega_inf > 0 &&
+          std::isfinite(bfield.angular_max)))
+      return true;
+    auto [rmin, rmax] = geodesic.radius_bounds();
+    if (!(rmin > geodesic.rs && rmax >= rmin))
+      return true;
+    double scale = 0.5 * bfield.B_pole * B_to_omega *
+                   comp.charge_mass_ratio / omega_inf;
+    double xmin = scale * bfield.angular_min *
+                  std::pow(bfield.R_star / rmax, 2 + bfield.p) *
+                  std::sqrt(1 - geodesic.rs / rmin);
+    double xmax = scale * bfield.angular_max *
+                  std::pow(bfield.R_star / rmin, 2 + bfield.p) *
+                  std::sqrt(1 - geodesic.rs / rmax);
+    if (!std::isfinite(xmin) || !std::isfinite(xmax))
+      return true;
+    // Resonance requires x = gamma*(1-beta*mu), hence 1/edge <= x <= edge.
+    double edge = std::sqrt((1 + beta) / (1 - beta));
+    return !(xmin > edge * (1 + 1e-10) || xmax < (1 - 1e-10) / edge);
   }
   static
   double
@@ -207,6 +279,10 @@ struct PhotonEvolution {
       double l, x, mu;
     };
     auto sample = [&](double l) {
+      if (options.cache_tolerance > 0) {
+        auto b = transport(l);
+        return ScanPoint{l, comp.charge_mass_ratio * b.x_e, b.mu};
+      }
       auto b = get_basis(l);
       return ScanPoint{l, comp.charge_mass_ratio * b.x_e, b.mu};
     };
@@ -255,7 +331,9 @@ struct PhotonEvolution {
                           PolarizationAt const& pol_at) {
     auto cuts = integration_cuts(left, right);
     auto integrand = [&](double l) {
-      return total_rate(rates(get_basis(l), pol_at(l)));
+      if (options.cache_tolerance > 0)
+        return total_rate(rates_at(transport(l), [&] { return pol_at(l); }));
+      return total_rate(rates_at(get_basis(l), [&] { return pol_at(l); }));
     };
     for (size_t j = 0; j + 1 < cuts.size(); ++j) {
       double a = cuts[j], b = cuts[j + 1];
@@ -271,7 +349,7 @@ struct PhotonEvolution {
       if (dtau > 0 && tau + dtau > 0) {
         // Find the point where the optical depth reaches zero.
         auto residual = [&](double l) { return tau + integral(l); };
-        double l = ridders_root(residual, a, b, tau, tau + dtau);
+        double l = ridders_root(residual, a, b, tau, tau + dtau, options.event_rtol * (b - a));
         Polarization incoming = pol_at(l);
         Rate event = select_rate(rates(get_basis(l), incoming));
         scattered_data = {geodesic.interp(l), event.beta};
@@ -330,6 +408,8 @@ struct PhotonEvolution {
   evolve() {
     while (true) {
       bool absorbed = geodesic.step();
+      cache.leaves.clear();
+      bool possible_scattering = may_resonate();
       if (pol.is_adiabatic) {
         auto f_couple = [&](double l) {
           Basis basis = get_basis(l);
@@ -341,16 +421,23 @@ struct PhotonEvolution {
         }
       }
       double left = geodesic.l_old(), right = geodesic.l_new();
+      if (options.cache_tolerance > 0 && (possible_scattering || !pol.is_adiabatic)) {
+        cache.tolerance = options.cache_tolerance;
+        cache.build(left, right, [&](double l) { return sample_transport(l); });
+      }
       if (pol.is_adiabatic) {
-        if (integrate_optical_depth(left, right, [&](double) { return pol; }))
+        if (possible_scattering &&
+            integrate_optical_depth(left, right, [&](double) { return pol; }))
           return EvolveResult::Scattered;
       } else {
         StepperMagnus stepper;
         stepper.init(geodesic.l_old(), geodesic.l_new(),
                      0.1 * (geodesic.l_new() - geodesic.l_old()), pol.stokes);
-        auto omega = [&](double l) { return get_basis(l).omega; };
+        auto omega = [&](double l) {
+          return options.cache_tolerance > 0 ? transport(l).omega : get_basis(l).omega;
+        };
         while (stepper.do_step(omega)) {
-          if (integrate_optical_depth(
+          if (possible_scattering && integrate_optical_depth(
                   stepper.x_old, stepper.x_new,
                   [&](double l) { return Polarization(stepper.dense_out(l)); }))
             return EvolveResult::Scattered;
