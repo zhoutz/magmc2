@@ -145,10 +145,8 @@ struct PhotonEvolution {
   Rates
   rates(Basis const& b, Polarization const& pol) const {
     Rates result{};
-    double qb = pol.is_adiabatic
-                    ? (pol.apol == AdiabaticPolarization::O ? 1 : -1)
-                    : b.c * pol.stokes.x + b.s * pol.stokes.y;
-    double v = pol.is_adiabatic ? 0 : pol.stokes.z;
+    Stokes sb = pol.in_B(b.c, b.s);
+    double qb = sb.x, v = sb.z;
 
     if (comp.current_fraction == 0 || b.twist == 0)
       return result;
@@ -253,10 +251,11 @@ struct PhotonEvolution {
 
   template <class PolarizationAt>
   bool
-  integrate_scattering(double left, double right, PolarizationAt const& pol) {
+  integrate_optical_depth(double left, double right,
+                          PolarizationAt const& pol_at) {
     auto cuts = integration_cuts(left, right);
     auto integrand = [&](double l) {
-      return total_rate(rates(get_basis(l), pol(l)));
+      return total_rate(rates(get_basis(l), pol_at(l)));
     };
     for (size_t j = 0; j + 1 < cuts.size(); ++j) {
       double a = cuts[j], b = cuts[j + 1];
@@ -273,10 +272,10 @@ struct PhotonEvolution {
         // Find the point where the optical depth reaches zero.
         auto residual = [&](double l) { return tau + integral(l); };
         double l = ridders_root(residual, a, b, tau, tau + dtau);
-        Stokes incoming = pol(l);
-        Rate event = select_rate(rates(get_basis(l), incoming, is_adiabatic));
+        Polarization incoming = pol_at(l);
+        Rate event = select_rate(rates(get_basis(l), incoming));
         scattered_data = {geodesic.interp(l), event.beta};
-        stokes = incoming;
+        pol = incoming;
         return true;
       }
       tau += dtau;
@@ -300,24 +299,6 @@ struct PhotonEvolution {
            std::abs(b.mu - x * dmu / tx) < 1;
   }
 
-  static
-  Stokes
-  observer_stokes(Stokes S, double3 k, double3 normal) {
-    double3 axis{0, 0, 1};
-    double3 u = axis + (-dot(axis, k)) * k;
-    if (u.length() < 1e-12) {
-      axis = {1, 0, 0};
-      u = axis + (-dot(axis, k)) * k;
-    }
-    u = to_unit(u);
-    double c = dot(u, cross(normal, k)), s = dot(u, normal);
-    double norm = std::hypot(c, s);
-    c /= norm;
-    s /= norm;
-    double c2 = c * c - s * s, s2 = 2 * c * s;
-    return {c2 * S.x + s2 * S.y, -s2 * S.x + c2 * S.y, S.z};
-  }
-
   void
   record_escape(double l, Geodesic::YVector y) {
     auto [r, psi, alpha] = y;
@@ -329,7 +310,7 @@ struct PhotonEvolution {
     };
     double psi_inf = psi + quad.qags(integrand, 0, 1, 1e-11, 1e-11);
     double3 k = to_unit(std::cos(psi_inf) * e1 + std::sin(psi_inf) * e2);
-    Stokes sky = observer_stokes(stokes, k, n);
+    Stokes sky = pol.observer_stokes(k, n);
     escaped_data = {omega_inf, std::clamp(k.z, -1.0, 1.0), sky.x, sky.y, sky.z};
   }
 
@@ -349,33 +330,32 @@ struct PhotonEvolution {
   evolve() {
     while (true) {
       bool absorbed = geodesic.step();
-      if (is_adiabatic) {
+      if (pol.is_adiabatic) {
         auto f_couple = [&](double l) {
           Basis basis = get_basis(l);
           return options.eta_couple * basis.kappa * basis.r - 1;
         };
         if (f_couple(geodesic.l_old()) < 0) {
-          stokes = eigenmode(get_basis(geodesic.l_old()));
-          is_adiabatic = false;
+          Basis b = get_basis(geodesic.l_old());
+          pol.set_stokes(b.c, b.s);
         }
       }
       double left = geodesic.l_old(), right = geodesic.l_new();
-      if (is_adiabatic) {
-        if (integrate_scattering(left, right,
-                                 [&](double) { return Stokes{0, 0, 0}; }))
+      if (pol.is_adiabatic) {
+        if (integrate_optical_depth(left, right, [&](double) { return pol; }))
           return EvolveResult::Scattered;
       } else {
         StepperMagnus stepper;
         stepper.init(geodesic.l_old(), geodesic.l_new(),
-                     0.1 * (geodesic.l_new() - geodesic.l_old()), stokes);
+                     0.1 * (geodesic.l_new() - geodesic.l_old()), pol.stokes);
         auto omega = [&](double l) { return get_basis(l).omega; };
         while (stepper.do_step(omega)) {
-          if (integrate_scattering(stepper.x_old, stepper.x_new, [&](double l) {
-                return stepper.dense_out(l);
-              }))
+          if (integrate_optical_depth(
+                  stepper.x_old, stepper.x_new,
+                  [&](double l) { return Polarization(stepper.dense_out(l)); }))
             return EvolveResult::Scattered;
 
-          stokes = stepper.y_new;
+          pol.set_stokes(stepper.y_new);
           auto y = geodesic.interp(stepper.x_new);
           double change = (stepper.y_new + (-1.0) * stepper.y_old).length() *
                           y[0] / (stepper.x_new - stepper.x_old);
