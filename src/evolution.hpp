@@ -5,6 +5,7 @@
 #include "geodesic.hpp"
 #include "initialize.hpp"
 #include "magnus.hpp"
+#include "polarization.hpp"
 #include "quad.hpp"
 #include "ran.hpp"
 
@@ -15,6 +16,7 @@ struct PhotonEvolution {
     double quad_atol = 1e-8, quad_rtol = 1e-8;
     int n_knots = 8, n_scan = 8;
   } options;
+
   BField const& bfield;
   Init const& initializer;
   Comp comp;
@@ -22,14 +24,11 @@ struct PhotonEvolution {
   Geodesic geodesic;
   Quad quad;
 
-  std::vector<double> knots;
-
   double3 n, e1, e2;
   double omega_inf, tau;
+  Polarization pol;
 
-  bool is_adiabatic;
-  AdiabaticPolarization apol;
-  Stokes stokes;
+  std::vector<double> knots;
 
   PhotonEvolution(double M_star, double R_star, int seed, BField const& bfield,
                   Init const& init, Comp const& comp)
@@ -93,12 +92,6 @@ struct PhotonEvolution {
     return basis(y);
   }
 
-  Stokes
-  eigenmode(Basis const& b) const {
-    double sign = apol == AdiabaticPolarization::O ? 1 : -1;
-    return {sign * b.c, sign * b.s, 0};
-  }
-
   void
   init() {
     init(initializer.sample_initial_photon(ran));
@@ -110,9 +103,8 @@ struct PhotonEvolution {
     e1 = photon.e1;
     e2 = photon.e2;
     omega_inf = photon.omega_inf;
-    apol = photon.pol;
     tau = std::log(ran.U());
-    is_adiabatic = true;
+    pol.set_adiabatic(photon.pol);
   }
 
   static
@@ -151,11 +143,12 @@ struct PhotonEvolution {
   using Rates = std::array<Rate, 2>;
 
   Rates
-  rates(Basis const& b, Stokes S, bool adiabatic) const {
+  rates(Basis const& b, Polarization const& pol) const {
     Rates result{};
-    double qb = adiabatic ? (apol == AdiabaticPolarization::O ? 1 : -1)
-                          : b.c * S.x + b.s * S.y;
-    double v = adiabatic ? 0 : S.z;
+    double qb = pol.is_adiabatic
+                    ? (pol.apol == AdiabaticPolarization::O ? 1 : -1)
+                    : b.c * pol.stokes.x + b.s * pol.stokes.y;
+    double v = pol.is_adiabatic ? 0 : pol.stokes.z;
 
     if (comp.current_fraction == 0 || b.twist == 0)
       return result;
@@ -225,7 +218,8 @@ struct PhotonEvolution {
     grid.reserve(options.n_scan + 1);
     grid.push_back(sample(left));
     for (int j = 1; j <= options.n_scan; ++j)
-      grid.push_back(sample(std::lerp(left, right, double(j) / options.n_scan)));
+      grid.push_back(
+          sample(std::lerp(left, right, double(j) / options.n_scan)));
 
     auto scan = [&](auto const& value) {
       auto f = [&](double l) {
@@ -249,9 +243,7 @@ struct PhotonEvolution {
     scan([](double x, double mu) { return discriminant(x, mu); });
     for (double beta : knots) {
       double inv_gamma = std::sqrt((1 - beta) * (1 + beta));
-      scan([&](double x, double mu) {
-        return x * inv_gamma + beta * mu - 1;
-      });
+      scan([&](double x, double mu) { return x * inv_gamma + beta * mu - 1; });
     }
 
     std::sort(cuts.begin(), cuts.end());
@@ -264,7 +256,7 @@ struct PhotonEvolution {
   integrate_scattering(double left, double right, PolarizationAt const& pol) {
     auto cuts = integration_cuts(left, right);
     auto integrand = [&](double l) {
-      return total_rate(rates(get_basis(l), pol(l), is_adiabatic));
+      return total_rate(rates(get_basis(l), pol(l)));
     };
     for (size_t j = 0; j + 1 < cuts.size(); ++j) {
       double a = cuts[j], b = cuts[j + 1];
