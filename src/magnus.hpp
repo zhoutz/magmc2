@@ -69,7 +69,7 @@ struct StepperMagnus {
     prepared = false;
   }
 
-  // Inspect/integrate optical depth using dense_out before update_old().
+  // Inspect/integrate optical depth using interp before update_old().
   // false means the initialized interval has been completely committed.
   template <class DerivFunc>
   bool
@@ -140,7 +140,7 @@ struct StepperMagnus {
   }
 
   Stokes
-  dense_out(double x) const {
+  interp(double x) const {
     if (!prepared)
       throw std::logic_error(
           "StepperMagnus dense output requires an accepted step");

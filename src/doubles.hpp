@@ -32,6 +32,12 @@ operator+(double3 const& a, double3 const& b) {
 
 inline
 double3
+operator-(double3 const& a, double3 const& b) {
+  return {a.x - b.x, a.y - b.y, a.z - b.z};
+}
+
+inline
+double3
 operator*(double a, double3 const& b) {
   return {a * b.x, a * b.y, a * b.z};
 }

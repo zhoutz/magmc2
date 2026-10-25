@@ -220,7 +220,7 @@ struct StepperDopr5 {
   }
 
   YVector
-  dense_out(double x) const {
+  interp(double x) const {
     YVector ret;
     double s = (x - x_old) / h_dense;
     double s1 = 1.0 - s;
@@ -250,9 +250,9 @@ struct StepperDopr5 {
 
       for (auto& event : events) {
         if (event.active) {
-          event.x = bisect_root(
-              [&](double x) { return event.func(x, dense_out(x)); }, x_old,
-              x_new, event.func(x_old, y_old), event.func(x_new, y_new));
+          event.x = ridders_root(
+              [&](double x) { return event.func(x, interp(x)); }, x_old, x_new,
+              event.func(x_old, y_old), event.func(x_new, y_new));
         }
       }
 
@@ -266,7 +266,7 @@ struct StepperDopr5 {
         }
       }
       double leftmost_x = leftmost_event->x;
-      y_new = dense_out(leftmost_x);
+      y_new = interp(leftmost_x);
       derivs(leftmost_x, y_new, dydx_new);
       h_old = leftmost_x - x_old;
 

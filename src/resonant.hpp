@@ -4,7 +4,6 @@
 #include "doubles.hpp"
 #include "evolution.hpp"
 #include "find_root.hpp"
-#include "geodesic.hpp"
 #include "initialize.hpp"
 #include "polarization.hpp"
 #include "quad.hpp"
@@ -28,10 +27,10 @@ struct ResonantScattering {
   static_assert(n_components > 0,
                 "At least one scattering component is required");
   struct Options {
-    double quad_atol = 1e-8, quad_rtol = 1e-8;
+    double quad_atol = 1e-6, quad_rtol = 1e-6;
     // n_knots sets the constructor's velocity grid;
     // n_scan is used per interval.
-    int n_knots = 8, n_scan = 8;
+    int n_knots = 4, n_scan = 4;
   } options;
 
   // Distributions and their bounds use signed velocities along B.
@@ -46,8 +45,7 @@ struct ResonantScattering {
     }(std::index_sequence_for<Comps...>{});
   }
 
-  ResonantScattering(std::tuple<Comps...> components,
-                     Options options = Options{})
+  ResonantScattering(std::tuple<Comps...> components, Options options = {})
       : options(options), components(std::move(components)) {
     if (options.n_knots < 2 || options.n_scan < 1)
       throw std::invalid_argument("Invalid resonance integration grid");
@@ -62,7 +60,7 @@ struct ResonantScattering {
     });
   }
 
-  struct ScatteredData {
+  struct ScatterData {
     Basis basis;
     double beta;
   };
@@ -81,14 +79,24 @@ struct ResonantScattering {
 
   // Sorted roots of (x^2+mu^2) beta^2 - 2 mu beta + (1-x^2)=0.
   // Compute one root without cancellation, the other by their product.
+  struct ResonantRoot {
+    double beta, sqrtD, mup;
+  };
   static
-  std::array<double, 2>
+  std::array<ResonantRoot, 2>
   resonance_roots(double x, double mu, double D) {
     double a = x * x + mu * mu;
-    double q = mu + std::copysign(x * std::sqrt(D), mu);
-    std::array<double, 2> roots{q / a, ((1 - x) * (1 + x)) / q};
-    if (roots[1] < roots[0])
-      std::swap(roots[0], roots[1]);
+    double sqrtD = std::sqrt(D);
+    double q = mu + std::copysign(x * sqrtD, mu);
+    std::array<ResonantRoot, 2> roots{{
+        {.beta = q / a, .sqrtD = sqrtD, .mup = sqrtD / x},
+        {.beta = ((1 - x) * (1 + x)) / q, .sqrtD = sqrtD, .mup = -sqrtD / x},
+    }};
+    if (roots[1].beta < roots[0].beta) {
+      // mup for the lower root is positive, for the upper root is negative.
+      // so we do not swap the mup values when swapping the roots.
+      std::swap(roots[0].beta, roots[1].beta);
+    }
     return roots;
   }
 
@@ -104,7 +112,7 @@ struct ResonantScattering {
 
   struct Rate {
     std::size_t icomp = 0;
-    int iroot = 0; // 0 = lower beta root, 1 = upper beta root
+    int jroot = 0; // 0 = lower beta root, 1 = upper beta root
     double beta = 0, weight = 0;
   };
   using Rates = std::array<Rate, 2 * n_components>;
@@ -139,15 +147,16 @@ struct ResonantScattering {
         return;
       auto roots = resonance_roots(x, b.mu, D);
       for (int j = 0; j < 2; ++j) {
-        double beta = roots[j];
+        double beta = roots[j].beta;
+        double sqrtD = roots[j].sqrtD;
+        double mup = roots[j].mup;
         double f = comp.dist.f(beta);
         if (!(beta > -1 && beta < 1) || f == 0)
           continue;
         double t = (1 - beta) * (1 + beta);
-        double mup = std::clamp((b.mu - beta) / (1 - beta * b.mu), -1.0, 1.0);
         // Equivalent to (1-beta*mu)^2(1-beta^2)/abs(mu-beta),
         // but avoids cancellation at coalescing roots.
-        double jacobian = x * x * t * std::sqrt(t) / std::sqrt(D);
+        double jacobian = x * x * t * std::sqrt(t) / sqrtD;
         double w = current_factor * comp.current_fraction *
                    comp.dist.inv_abs_b_mean * f * jacobian *
                    overlap(qb, v, mup, comp.charge_sign);
@@ -190,7 +199,7 @@ struct ResonantScattering {
   integration_cuts(double left, double right, BasisAt const& get_basis) const {
     std::vector<double> cuts{left, std::midpoint(left, right), right};
     struct ScanPoint {
-      double l, x, mu;
+      double l, xe, mu;
     };
     auto sample = [&](double l) {
       auto b = get_basis(l);
@@ -208,11 +217,11 @@ struct ResonantScattering {
     auto scan = [&](auto const& value) {
       auto f = [&](double l) {
         auto point = sample(l);
-        return value(point.x, point.mu);
+        return value(point.xe, point.mu);
       };
-      double a = grid.front().l, fa = value(grid.front().x, grid.front().mu);
-      for (size_t j = 1; j < grid.size(); ++j) {
-        double b = grid[j].l, fb = value(grid[j].x, grid[j].mu);
+      double a = grid.front().l, fa = value(grid.front().xe, grid.front().mu);
+      for (int j = 1; j < (int)grid.size(); ++j) {
+        double b = grid[j].l, fb = value(grid[j].xe, grid[j].mu);
         if (fa == 0)
           cuts.push_back(a);
         if (fb == 0)
@@ -246,13 +255,13 @@ struct ResonantScattering {
   // retains its value at the beginning of the containing integration segment.
   // The caller applies the returned event and resets tau after scattering.
   template <class BasisAt, class PolarizationAt>
-  std::optional<ScatteredData>
+  std::optional<ScatterData>
   integrate_optical_depth(double left, double right, BasisAt const& get_basis,
-                          PolarizationAt const& pol_at, double& tau, Ran& ran,
+                          PolarizationAt const& get_pol, double& tau, Ran& ran,
                           Quad& quad) const {
     auto cuts = integration_cuts(left, right, get_basis);
     auto integrand = [&](double l) {
-      return total_rate(rates(get_basis(l), pol_at(l)));
+      return total_rate(rates(get_basis(l), get_pol(l)));
     };
     for (size_t j = 0; j + 1 < cuts.size(); ++j) {
       double a = cuts[j], b = cuts[j + 1];
@@ -270,36 +279,28 @@ struct ResonantScattering {
         auto residual = [&](double l) { return tau + integral(l); };
         double l =
             ridders_root(residual, a, b, tau, tau + dtau, 1e-5 * (b - a));
-        Polarization incoming = pol_at(l);
-        Rate event = select_rate(rates(get_basis(l), incoming), ran);
-        return ScatteredData{get_basis(l), event.beta};
+        Rate event = select_rate(rates(get_basis(l), get_pol(l)), ran);
+        return ScatterData{get_basis(l), event.beta};
       }
       tau += dtau;
     }
     return std::nullopt;
   }
 
-  template <class BasisForState>
   bool
-  resonance_escape(double l, Geodesic const& geodesic,
-                   BasisForState const& basis, double omega_inf) const {
-    auto y = geodesic.interp(l);
-    if (std::cos(y[2]) <= 0)
-      return false; // Infinity reconstruction is only for the outgoing branch.
-    auto b = basis(y);
-    double h = 1e-3 * geodesic.stepper.h_old;
-    auto minus = basis(geodesic.interp(l - h));
-    double xe = x_e(b.Bmag, b.energy_local);
-    double dx = (xe - x_e(minus.Bmag, minus.energy_local)) / (h);
-    double dmu = (b.mu - minus.mu) / (h);
+  resonance_escape(double h, Basis const& b_old, Basis const& b_new) const {
+    double xe = x_e(b_new.Bmag, b_new.energy_local);
+    double mu = b_new.mu;
+    double dx = (xe - x_e(b_old.Bmag, b_old.energy_local)) / h;
+    double dmu = (b_new.mu - b_old.mu) / h;
     bool escaped = true;
     for_each_component([&](std::size_t, auto const& comp) {
       if (comp.current_fraction == 0)
         return;
       double x = comp.charge_mass_ratio * xe;
       double tx = comp.charge_mass_ratio * dx;
-      escaped = escaped && discriminant(x, b.mu) < 0 && tx < 0 &&
-                std::abs(b.mu - x * dmu / tx) < 1;
+      escaped = escaped && discriminant(x, mu) < 0 && tx < 0 &&
+                std::abs(mu - x * dmu / tx) < 1;
     });
     return escaped;
   }
@@ -318,8 +319,7 @@ struct ResonantScattering {
 
   static
   InitializedPhoton
-  perform_scattering(ScatteredData scattered_data, double energy_inf,
-                     Ran& ran) {
+  perform_scattering(ScatterData scattered_data, double energy_inf, Ran& ran) {
     auto const& b = scattered_data.basis;
     double beta = scattered_data.beta;
     double mup = sample_mup(ran);

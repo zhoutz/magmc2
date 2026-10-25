@@ -6,17 +6,28 @@
 #include <cmath>
 
 struct Geodesic {
-  using YVector = std::array<double, 3>;
+  struct Options {
+    double orbit_atol = 1e-10;
+    double orbit_rtol = 1e-10;
+    double escape_factor = 1e5;
+    Options() : orbit_atol(1e-10), orbit_rtol(1e-10), escape_factor(1e5) {}
+  } options;
+
+  using State = std::array<double, 3>;
 
   double rs, R_star;
   StepperDopr5<3, Geodesic> stepper;
 
-  Geodesic(double M_star, double R_star, double orbit_atol = 1e-10,
-           double orbit_rtol = 1e-10)
-      : rs(M_star * schwarzschild_radius_of_sun_in_km), R_star(R_star),
-        stepper(*this, orbit_atol, orbit_rtol) {
+  Geodesic(double M_star, double R_star, Options options = {})
+      : options(options), rs(M_star * schwarzschild_radius_of_sun_in_km),
+        R_star(R_star), stepper(*this, options.orbit_atol, options.orbit_rtol) {
+    // absorb at the surface
     stepper.add_event(
-        [R_star](double, YVector const& y) { return y[0] - R_star; });
+        [R_star](double, State const& y) { return y[0] - R_star; });
+    // escape at escape_factor*R_star
+    stepper.add_event([R_star, options](double, State const& y) {
+      return y[0] - options.escape_factor * R_star;
+    });
   }
 
   void
@@ -33,19 +44,19 @@ struct Geodesic {
     return stepper.x_old + stepper.h_old;
   }
 
-  bool
+  int
   step() {
     stepper.do_step(0.1 * stepper.y_old[0]);
-    return stepper.detect_event() == 0;
+    return stepper.detect_event();
   }
 
-  YVector
+  State
   interp(double l) const {
-    return stepper.dense_out(l);
+    return stepper.interp(l);
   }
 
   void
-  operator()(double, YVector const& y, YVector& dydx) const {
+  operator()(double, State const& y, State& dydx) const {
     auto [r, psi, alpha] = y;
     double L = std::sqrt(1 - rs / r);
     dydx[0] = L * std::cos(alpha);
