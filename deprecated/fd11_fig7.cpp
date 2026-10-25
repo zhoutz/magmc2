@@ -6,9 +6,10 @@
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
+#include <print>
 #include <string_view>
 
-// PhotonEvolution evaluates dist.f(charge_sign * beta). FD11's electrons
+// ResonantScattering evaluates dist.f(charge_sign * beta). FD11's electrons
 // travel along +B (north to south), independently of their negative charge.
 // Reflect only the distribution's argument, not the field or the sky axes.
 struct FD11Electrons {
@@ -83,11 +84,11 @@ int main(int argc, char** argv) {
     if (args.tight) {
       options.eta_couple = 3e-4;
       options.escape_tolerance = 3e-4;
-      options.quad_atol = options.quad_rtol = 1e-9;
-      options.n_scan = 16;
+      options.resonant.quad_atol = options.resonant.quad_rtol = 1e-9;
+      options.resonant.n_scan = 16;
     }
     Evolution photon(mass, R, args.seed, field, initializer, electrons, options);
-    for (double beta : photon.knots)
+    for (double beta : photon.resonant.knots)
       if (!(beta >= 0.2 && beta <= std::sqrt(0.75)))
         throw std::runtime_error("Incorrect electron velocity direction");
 
@@ -114,9 +115,9 @@ int main(int argc, char** argv) {
         << "\n# north_fraction = 0.5\n# e_mode_fraction = 1"
         << "\n# eta_couple = " << options.eta_couple
         << "\n# escape_tolerance = " << options.escape_tolerance
-        << "\n# quad_atol = " << options.quad_atol
-        << "\n# quad_rtol = " << options.quad_rtol
-        << "\n# n_knots = " << options.n_knots << "\n# n_scan = " << options.n_scan
+        << "\n# quad_atol = " << options.resonant.quad_atol
+        << "\n# quad_rtol = " << options.resonant.quad_rtol
+        << "\n# n_knots = " << options.resonant.n_knots << "\n# n_scan = " << options.resonant.n_scan
         << "\n# geodesic_atol = 1e-10\n# geodesic_rtol = 1e-10"
         << "\n# magnus_atol = 1e-6\n# magnus_rtol = 1e-6"
         << "\n# stokes_basis = projected_magnetic_axis_right_handed_sky"
