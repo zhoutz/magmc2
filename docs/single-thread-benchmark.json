@@ -1,0 +1,409 @@
+{
+  "42-2000-report-main": {
+    "byte_identical": true,
+    "passed": true,
+    "rows": 2000,
+    "timings": [
+      {
+        "reference": 10.158749292000001,
+        "candidate": 4.225224583000003
+      },
+      {
+        "candidate": 4.167390916999999,
+        "reference": 10.182985500000001
+      },
+      {
+        "reference": 10.245720250000005,
+        "candidate": 4.211112458999999
+      },
+      {
+        "candidate": 4.11843975,
+        "reference": 10.156903416999995
+      },
+      {
+        "reference": 10.124975958999997,
+        "candidate": 4.188015958999998
+      }
+    ],
+    "output_sha256": {
+      "reference": "29d8875aaabf754cddc0c4b13b77f59d000b304307d107679f00402c7e9f0ce2",
+      "candidate": "29d8875aaabf754cddc0c4b13b77f59d000b304307d107679f00402c7e9f0ce2"
+    },
+    "compiler": "g++-16 (Homebrew GCC 16.2.0) 16.2.0",
+    "flags": [
+      "-std=c++23",
+      "-O3",
+      "-march=native",
+      "-Wall",
+      "-Wextra",
+      "-Wpedantic",
+      "-I/opt/homebrew/include",
+      "-L/opt/homebrew/lib",
+      "-lstdc++exp",
+      "-lgsl",
+      "-lgslcblas"
+    ],
+    "source_sha256": {
+      "reference": {
+        "bessel_K1_scaled.hpp": "17988f3be1a5c7089eaf630278512466c2a6350579b09a53a5f7b2a4177473e0",
+        "bfield.hpp": "3556b92fea56c7d34527d9d18f796e641c29fa30d3400252d512f726ae38806a",
+        "component.hpp": "3a114ef970d8782422b2ac51fc048999623f345747817b87387d9e830658940c",
+        "constants.hpp": "73b657af37449485a732df7d74b8f932e17974ac613ac703f4bd1ccd4fb9a035",
+        "distribution.hpp": "8ac7b7b2c25be1737e55bcbc2b5f1e15f864c49e6951d17736c869a32f23310d",
+        "dopr5.hpp": "b219c4cda370dcd95a3ebcef5b69db70e3beb30cd74f4cf5958aaa46cc285451",
+        "doubles.hpp": "6c23d8bd4cb5a8427dc319740f68e925ba6bab9544fdc20b648537520da4db6b",
+        "evolution.hpp": "722d8301f8e9931802b6da16831a2786d197cf7a1e51dc27d3d70e13ecee3bfe",
+        "find_root.hpp": "e7f7db78e9c52152445f70351e4c0cd0b66cf95f6d1c449709fbf66387393d26",
+        "geodesic.hpp": "aec0ccd45a6201f454870b772982362b142717d0bb83b6fc2b575bde176fad52",
+        "hunt.hpp": "675c77c6364dc9625dd00a149154c786d2aa3cf0a21b4e9547db2565c566b19c",
+        "initialize.hpp": "95a1c8f40a8e71e5691023fd19e0734277ef7aa54901a76512b133aef6ffff78",
+        "magnus.hpp": "806a031a8ac06e5d1c13e696e47c6db19095d0994c2241e42c33b2579606b71c",
+        "main.cpp": "c3ee3b1a77a3a51e115946dc93bfee4518c5e4ec0ee70df6be4fe13e6f284c9f",
+        "polarization.hpp": "f088c07346b6ca018dad24d8d56a3eba03c69a10e973c2b800c9fee89c6e8812",
+        "quad.hpp": "f703b8b39a4ccd80f602d3a9aaec91152516b1898ff5e1620293c8e6c0001897",
+        "ran.hpp": "f48e7a15dc4f93057996630a9f9d500e3c3a24a3a3817c5710173bc87b450131",
+        "resonant.hpp": "58261d184e87560860a6776fcc7005ac64bbc21cc90982fffe8ae83041e58e3c"
+      },
+      "candidate": {
+        "bessel_K1_scaled.hpp": "17988f3be1a5c7089eaf630278512466c2a6350579b09a53a5f7b2a4177473e0",
+        "bfield.hpp": "19de0a63cb710a3a9ad8309b5f9bb175ee83b830774348a5b0f771a6ea54c292",
+        "component.hpp": "3a114ef970d8782422b2ac51fc048999623f345747817b87387d9e830658940c",
+        "constants.hpp": "73b657af37449485a732df7d74b8f932e17974ac613ac703f4bd1ccd4fb9a035",
+        "distribution.hpp": "8ac7b7b2c25be1737e55bcbc2b5f1e15f864c49e6951d17736c869a32f23310d",
+        "dopr5.hpp": "b219c4cda370dcd95a3ebcef5b69db70e3beb30cd74f4cf5958aaa46cc285451",
+        "doubles.hpp": "6c23d8bd4cb5a8427dc319740f68e925ba6bab9544fdc20b648537520da4db6b",
+        "evolution.hpp": "f5f0c93d94f8b39eb8cc329261a14ec8b211d5d85d1c5d45fb4caab61e7c6e86",
+        "find_root.hpp": "e7f7db78e9c52152445f70351e4c0cd0b66cf95f6d1c449709fbf66387393d26",
+        "geodesic.hpp": "aec0ccd45a6201f454870b772982362b142717d0bb83b6fc2b575bde176fad52",
+        "hunt.hpp": "675c77c6364dc9625dd00a149154c786d2aa3cf0a21b4e9547db2565c566b19c",
+        "initialize.hpp": "95a1c8f40a8e71e5691023fd19e0734277ef7aa54901a76512b133aef6ffff78",
+        "interval.hpp": "7ed673c0fb92eea53aa5d447a1f403e65183fed7d0decd9c9053cc7a5c7f16da",
+        "magnus.hpp": "255e2c8f608a63b37da7f8ecc00de3173943a97aee5a38d0282c5b4ddb9a14ca",
+        "main.cpp": "c3ee3b1a77a3a51e115946dc93bfee4518c5e4ec0ee70df6be4fe13e6f284c9f",
+        "polarization.hpp": "f088c07346b6ca018dad24d8d56a3eba03c69a10e973c2b800c9fee89c6e8812",
+        "quad.hpp": "6feeedfea6ee4b5a58cf7aedcac6d3d802ff105b3385841acbf52611a7a35542",
+        "ran.hpp": "f48e7a15dc4f93057996630a9f9d500e3c3a24a3a3817c5710173bc87b450131",
+        "resonant.hpp": "8f4e7a1bef2dc161ea5905e436f59c9c516208669f8520c75b1a44eb2b0acd8d",
+        "transport_stats.hpp": "1d6ec05314701b527dc0abc7f7eb653246a363787f7fa67d2a6366597120a3a7"
+      }
+    },
+    "table_sha256": "fc947c28074590bcbea69314e1edbaaaf855c8f84f24c421d3acb05e7f2cda94",
+    "median_seconds": {
+      "reference": 10.158749292000001,
+      "candidate": 4.188015958999998
+    },
+    "speedup": 2.425671103322557,
+    "performance_passed": false,
+    "target_met": false
+  },
+  "42-2000-report": {
+    "photons": 2000,
+    "classification_changes": [],
+    "scattering_count_changes": [],
+    "fields": {
+      "energy_relative": {
+        "max": 0.0,
+        "worst_seed": 42,
+        "quantiles": {
+          "0.5": 0.0,
+          "0.95": 0.0,
+          "0.99": 0.0
+        }
+      },
+      "muk": {
+        "max": 0.0,
+        "worst_seed": 42,
+        "quantiles": {
+          "0.5": 0.0,
+          "0.95": 0.0,
+          "0.99": 0.0
+        }
+      },
+      "Q": {
+        "max": 0.0,
+        "worst_seed": 42,
+        "quantiles": {
+          "0.5": 0.0,
+          "0.95": 0.0,
+          "0.99": 0.0
+        }
+      },
+      "U": {
+        "max": 0.0,
+        "worst_seed": 42,
+        "quantiles": {
+          "0.5": 0.0,
+          "0.95": 0.0,
+          "0.99": 0.0
+        }
+      },
+      "V": {
+        "max": 0.0,
+        "worst_seed": 42,
+        "quantiles": {
+          "0.5": 0.0,
+          "0.95": 0.0,
+          "0.99": 0.0
+        }
+      }
+    },
+    "failed_seeds": [],
+    "passed": true,
+    "timings": [
+      {
+        "reference": 11.369382709,
+        "candidate": 4.548142917
+      }
+    ],
+    "output_sha256": {
+      "reference": "82aad10f5aac1aa266a47d54485f8da011eba68427a8027d07aa0a06ffe2f61d",
+      "candidate": "82aad10f5aac1aa266a47d54485f8da011eba68427a8027d07aa0a06ffe2f61d"
+    },
+    "compiler": "g++-16 (Homebrew GCC 16.2.0) 16.2.0",
+    "flags": [
+      "-std=c++23",
+      "-O3",
+      "-march=native",
+      "-Wall",
+      "-Wextra",
+      "-Wpedantic",
+      "-I/opt/homebrew/include",
+      "-L/opt/homebrew/lib",
+      "-lstdc++exp",
+      "-lgsl",
+      "-lgslcblas"
+    ],
+    "source_sha256": {
+      "reference": {
+        "bessel_K1_scaled.hpp": "17988f3be1a5c7089eaf630278512466c2a6350579b09a53a5f7b2a4177473e0",
+        "bfield.hpp": "3556b92fea56c7d34527d9d18f796e641c29fa30d3400252d512f726ae38806a",
+        "component.hpp": "3a114ef970d8782422b2ac51fc048999623f345747817b87387d9e830658940c",
+        "constants.hpp": "73b657af37449485a732df7d74b8f932e17974ac613ac703f4bd1ccd4fb9a035",
+        "distribution.hpp": "8ac7b7b2c25be1737e55bcbc2b5f1e15f864c49e6951d17736c869a32f23310d",
+        "dopr5.hpp": "b219c4cda370dcd95a3ebcef5b69db70e3beb30cd74f4cf5958aaa46cc285451",
+        "doubles.hpp": "6c23d8bd4cb5a8427dc319740f68e925ba6bab9544fdc20b648537520da4db6b",
+        "evolution.hpp": "722d8301f8e9931802b6da16831a2786d197cf7a1e51dc27d3d70e13ecee3bfe",
+        "find_root.hpp": "e7f7db78e9c52152445f70351e4c0cd0b66cf95f6d1c449709fbf66387393d26",
+        "geodesic.hpp": "aec0ccd45a6201f454870b772982362b142717d0bb83b6fc2b575bde176fad52",
+        "hunt.hpp": "675c77c6364dc9625dd00a149154c786d2aa3cf0a21b4e9547db2565c566b19c",
+        "initialize.hpp": "95a1c8f40a8e71e5691023fd19e0734277ef7aa54901a76512b133aef6ffff78",
+        "magnus.hpp": "806a031a8ac06e5d1c13e696e47c6db19095d0994c2241e42c33b2579606b71c",
+        "main.cpp": "c3ee3b1a77a3a51e115946dc93bfee4518c5e4ec0ee70df6be4fe13e6f284c9f",
+        "polarization.hpp": "f088c07346b6ca018dad24d8d56a3eba03c69a10e973c2b800c9fee89c6e8812",
+        "quad.hpp": "f703b8b39a4ccd80f602d3a9aaec91152516b1898ff5e1620293c8e6c0001897",
+        "ran.hpp": "f48e7a15dc4f93057996630a9f9d500e3c3a24a3a3817c5710173bc87b450131",
+        "resonant.hpp": "58261d184e87560860a6776fcc7005ac64bbc21cc90982fffe8ae83041e58e3c"
+      },
+      "candidate": {
+        "bessel_K1_scaled.hpp": "17988f3be1a5c7089eaf630278512466c2a6350579b09a53a5f7b2a4177473e0",
+        "bfield.hpp": "19de0a63cb710a3a9ad8309b5f9bb175ee83b830774348a5b0f771a6ea54c292",
+        "component.hpp": "3a114ef970d8782422b2ac51fc048999623f345747817b87387d9e830658940c",
+        "constants.hpp": "73b657af37449485a732df7d74b8f932e17974ac613ac703f4bd1ccd4fb9a035",
+        "distribution.hpp": "8ac7b7b2c25be1737e55bcbc2b5f1e15f864c49e6951d17736c869a32f23310d",
+        "dopr5.hpp": "b219c4cda370dcd95a3ebcef5b69db70e3beb30cd74f4cf5958aaa46cc285451",
+        "doubles.hpp": "6c23d8bd4cb5a8427dc319740f68e925ba6bab9544fdc20b648537520da4db6b",
+        "evolution.hpp": "f5f0c93d94f8b39eb8cc329261a14ec8b211d5d85d1c5d45fb4caab61e7c6e86",
+        "find_root.hpp": "e7f7db78e9c52152445f70351e4c0cd0b66cf95f6d1c449709fbf66387393d26",
+        "geodesic.hpp": "aec0ccd45a6201f454870b772982362b142717d0bb83b6fc2b575bde176fad52",
+        "hunt.hpp": "675c77c6364dc9625dd00a149154c786d2aa3cf0a21b4e9547db2565c566b19c",
+        "initialize.hpp": "95a1c8f40a8e71e5691023fd19e0734277ef7aa54901a76512b133aef6ffff78",
+        "interval.hpp": "7ed673c0fb92eea53aa5d447a1f403e65183fed7d0decd9c9053cc7a5c7f16da",
+        "magnus.hpp": "255e2c8f608a63b37da7f8ecc00de3173943a97aee5a38d0282c5b4ddb9a14ca",
+        "main.cpp": "c3ee3b1a77a3a51e115946dc93bfee4518c5e4ec0ee70df6be4fe13e6f284c9f",
+        "polarization.hpp": "f088c07346b6ca018dad24d8d56a3eba03c69a10e973c2b800c9fee89c6e8812",
+        "quad.hpp": "6feeedfea6ee4b5a58cf7aedcac6d3d802ff105b3385841acbf52611a7a35542",
+        "ran.hpp": "f48e7a15dc4f93057996630a9f9d500e3c3a24a3a3817c5710173bc87b450131",
+        "resonant.hpp": "8f4e7a1bef2dc161ea5905e436f59c9c516208669f8520c75b1a44eb2b0acd8d",
+        "transport_stats.hpp": "1d6ec05314701b527dc0abc7f7eb653246a363787f7fa67d2a6366597120a3a7"
+      }
+    },
+    "table_sha256": "fc947c28074590bcbea69314e1edbaaaf855c8f84f24c421d3acb05e7f2cda94",
+    "median_seconds": {
+      "reference": 11.369382709,
+      "candidate": 4.548142917
+    },
+    "speedup": 2.499785718365103,
+    "performance_passed": false,
+    "target_met": false
+  },
+  "100000-10000-report": {
+    "photons": 10000,
+    "classification_changes": [],
+    "scattering_count_changes": [],
+    "fields": {
+      "energy_relative": {
+        "max": 0.0,
+        "worst_seed": 100000,
+        "quantiles": {
+          "0.5": 0.0,
+          "0.95": 0.0,
+          "0.99": 0.0
+        }
+      },
+      "muk": {
+        "max": 0.0,
+        "worst_seed": 100000,
+        "quantiles": {
+          "0.5": 0.0,
+          "0.95": 0.0,
+          "0.99": 0.0
+        }
+      },
+      "Q": {
+        "max": 0.0,
+        "worst_seed": 100000,
+        "quantiles": {
+          "0.5": 0.0,
+          "0.95": 0.0,
+          "0.99": 0.0
+        }
+      },
+      "U": {
+        "max": 0.0,
+        "worst_seed": 100000,
+        "quantiles": {
+          "0.5": 0.0,
+          "0.95": 0.0,
+          "0.99": 0.0
+        }
+      },
+      "V": {
+        "max": 0.0,
+        "worst_seed": 100000,
+        "quantiles": {
+          "0.5": 0.0,
+          "0.95": 0.0,
+          "0.99": 0.0
+        }
+      }
+    },
+    "failed_seeds": [],
+    "passed": true,
+    "timings": [
+      {
+        "reference": 56.08247025,
+        "candidate": 26.799983958
+      }
+    ],
+    "output_sha256": {
+      "reference": "9094dc206b6f39f46a3090b92786f8c92119470564d8875076cecc3870eaba7a",
+      "candidate": "9094dc206b6f39f46a3090b92786f8c92119470564d8875076cecc3870eaba7a"
+    },
+    "compiler": "g++-16 (Homebrew GCC 16.2.0) 16.2.0",
+    "flags": [
+      "-std=c++23",
+      "-O3",
+      "-march=native",
+      "-Wall",
+      "-Wextra",
+      "-Wpedantic",
+      "-I/opt/homebrew/include",
+      "-L/opt/homebrew/lib",
+      "-lstdc++exp",
+      "-lgsl",
+      "-lgslcblas"
+    ],
+    "source_sha256": {
+      "reference": {
+        "bessel_K1_scaled.hpp": "17988f3be1a5c7089eaf630278512466c2a6350579b09a53a5f7b2a4177473e0",
+        "bfield.hpp": "3556b92fea56c7d34527d9d18f796e641c29fa30d3400252d512f726ae38806a",
+        "component.hpp": "3a114ef970d8782422b2ac51fc048999623f345747817b87387d9e830658940c",
+        "constants.hpp": "73b657af37449485a732df7d74b8f932e17974ac613ac703f4bd1ccd4fb9a035",
+        "distribution.hpp": "8ac7b7b2c25be1737e55bcbc2b5f1e15f864c49e6951d17736c869a32f23310d",
+        "dopr5.hpp": "b219c4cda370dcd95a3ebcef5b69db70e3beb30cd74f4cf5958aaa46cc285451",
+        "doubles.hpp": "6c23d8bd4cb5a8427dc319740f68e925ba6bab9544fdc20b648537520da4db6b",
+        "evolution.hpp": "722d8301f8e9931802b6da16831a2786d197cf7a1e51dc27d3d70e13ecee3bfe",
+        "find_root.hpp": "e7f7db78e9c52152445f70351e4c0cd0b66cf95f6d1c449709fbf66387393d26",
+        "geodesic.hpp": "aec0ccd45a6201f454870b772982362b142717d0bb83b6fc2b575bde176fad52",
+        "hunt.hpp": "675c77c6364dc9625dd00a149154c786d2aa3cf0a21b4e9547db2565c566b19c",
+        "initialize.hpp": "95a1c8f40a8e71e5691023fd19e0734277ef7aa54901a76512b133aef6ffff78",
+        "magnus.hpp": "806a031a8ac06e5d1c13e696e47c6db19095d0994c2241e42c33b2579606b71c",
+        "main.cpp": "c3ee3b1a77a3a51e115946dc93bfee4518c5e4ec0ee70df6be4fe13e6f284c9f",
+        "polarization.hpp": "f088c07346b6ca018dad24d8d56a3eba03c69a10e973c2b800c9fee89c6e8812",
+        "quad.hpp": "f703b8b39a4ccd80f602d3a9aaec91152516b1898ff5e1620293c8e6c0001897",
+        "ran.hpp": "f48e7a15dc4f93057996630a9f9d500e3c3a24a3a3817c5710173bc87b450131",
+        "resonant.hpp": "58261d184e87560860a6776fcc7005ac64bbc21cc90982fffe8ae83041e58e3c"
+      },
+      "candidate": {
+        "bessel_K1_scaled.hpp": "17988f3be1a5c7089eaf630278512466c2a6350579b09a53a5f7b2a4177473e0",
+        "bfield.hpp": "19de0a63cb710a3a9ad8309b5f9bb175ee83b830774348a5b0f771a6ea54c292",
+        "component.hpp": "3a114ef970d8782422b2ac51fc048999623f345747817b87387d9e830658940c",
+        "constants.hpp": "73b657af37449485a732df7d74b8f932e17974ac613ac703f4bd1ccd4fb9a035",
+        "distribution.hpp": "8ac7b7b2c25be1737e55bcbc2b5f1e15f864c49e6951d17736c869a32f23310d",
+        "dopr5.hpp": "b219c4cda370dcd95a3ebcef5b69db70e3beb30cd74f4cf5958aaa46cc285451",
+        "doubles.hpp": "6c23d8bd4cb5a8427dc319740f68e925ba6bab9544fdc20b648537520da4db6b",
+        "evolution.hpp": "f5f0c93d94f8b39eb8cc329261a14ec8b211d5d85d1c5d45fb4caab61e7c6e86",
+        "find_root.hpp": "e7f7db78e9c52152445f70351e4c0cd0b66cf95f6d1c449709fbf66387393d26",
+        "geodesic.hpp": "aec0ccd45a6201f454870b772982362b142717d0bb83b6fc2b575bde176fad52",
+        "hunt.hpp": "675c77c6364dc9625dd00a149154c786d2aa3cf0a21b4e9547db2565c566b19c",
+        "initialize.hpp": "95a1c8f40a8e71e5691023fd19e0734277ef7aa54901a76512b133aef6ffff78",
+        "interval.hpp": "7ed673c0fb92eea53aa5d447a1f403e65183fed7d0decd9c9053cc7a5c7f16da",
+        "magnus.hpp": "255e2c8f608a63b37da7f8ecc00de3173943a97aee5a38d0282c5b4ddb9a14ca",
+        "main.cpp": "c3ee3b1a77a3a51e115946dc93bfee4518c5e4ec0ee70df6be4fe13e6f284c9f",
+        "polarization.hpp": "f088c07346b6ca018dad24d8d56a3eba03c69a10e973c2b800c9fee89c6e8812",
+        "quad.hpp": "6feeedfea6ee4b5a58cf7aedcac6d3d802ff105b3385841acbf52611a7a35542",
+        "ran.hpp": "f48e7a15dc4f93057996630a9f9d500e3c3a24a3a3817c5710173bc87b450131",
+        "resonant.hpp": "8f4e7a1bef2dc161ea5905e436f59c9c516208669f8520c75b1a44eb2b0acd8d",
+        "transport_stats.hpp": "1d6ec05314701b527dc0abc7f7eb653246a363787f7fa67d2a6366597120a3a7"
+      }
+    },
+    "table_sha256": "fc947c28074590bcbea69314e1edbaaaf855c8f84f24c421d3acb05e7f2cda94",
+    "median_seconds": {
+      "reference": 56.08247025,
+      "candidate": 26.799983958
+    },
+    "speedup": 2.0926307395515793,
+    "performance_passed": false,
+    "target_met": false
+  },
+  "profile-report": {
+    "first": 42,
+    "count": 2000,
+    "counts": {
+      "reference": {
+        "basis": 70581218,
+        "cuts": 1096613,
+        "roots": 24521,
+        "quadrature": 2234806,
+        "integrand": 54152175,
+        "polarization": 43494057,
+        "excluded": 0,
+        "magnus": 1014400
+      },
+      "candidate": {
+        "basis": 24724183,
+        "cuts": 205030,
+        "roots": 23593,
+        "quadrature": 451176,
+        "integrand": 16695945,
+        "polarization": 10088118,
+        "excluded": 891583,
+        "magnus": 1014400
+      }
+    },
+    "output_byte_identical": true,
+    "fallback": "Active or uncertain intervals use the original QAGS and boundary scan"
+  },
+  "frozen_input": {
+    "src/find_root.hpp": "e7f7db78e9c52152445f70351e4c0cd0b66cf95f6d1c449709fbf66387393d26",
+    "src/evolution.hpp": "722d8301f8e9931802b6da16831a2786d197cf7a1e51dc27d3d70e13ecee3bfe",
+    "src/bfield.hpp": "3556b92fea56c7d34527d9d18f796e641c29fa30d3400252d512f726ae38806a",
+    "src/doubles.hpp": "6c23d8bd4cb5a8427dc319740f68e925ba6bab9544fdc20b648537520da4db6b",
+    "src/bessel_K1_scaled.hpp": "17988f3be1a5c7089eaf630278512466c2a6350579b09a53a5f7b2a4177473e0",
+    "src/component.hpp": "3a114ef970d8782422b2ac51fc048999623f345747817b87387d9e830658940c",
+    "src/resonant.hpp": "58261d184e87560860a6776fcc7005ac64bbc21cc90982fffe8ae83041e58e3c",
+    "src/geodesic.hpp": "aec0ccd45a6201f454870b772982362b142717d0bb83b6fc2b575bde176fad52",
+    "src/constants.hpp": "73b657af37449485a732df7d74b8f932e17974ac613ac703f4bd1ccd4fb9a035",
+    "src/quad.hpp": "f703b8b39a4ccd80f602d3a9aaec91152516b1898ff5e1620293c8e6c0001897",
+    "src/ran.hpp": "f48e7a15dc4f93057996630a9f9d500e3c3a24a3a3817c5710173bc87b450131",
+    "src/magnus.hpp": "806a031a8ac06e5d1c13e696e47c6db19095d0994c2241e42c33b2579606b71c",
+    "src/distribution.hpp": "8ac7b7b2c25be1737e55bcbc2b5f1e15f864c49e6951d17736c869a32f23310d",
+    "src/main.cpp": "c3ee3b1a77a3a51e115946dc93bfee4518c5e4ec0ee70df6be4fe13e6f284c9f",
+    "src/polarization.hpp": "f088c07346b6ca018dad24d8d56a3eba03c69a10e973c2b800c9fee89c6e8812",
+    "src/dopr5.hpp": "b219c4cda370dcd95a3ebcef5b69db70e3beb30cd74f4cf5958aaa46cc285451",
+    "src/initialize.hpp": "95a1c8f40a8e71e5691023fd19e0734277ef7aa54901a76512b133aef6ffff78",
+    "src/hunt.hpp": "675c77c6364dc9625dd00a149154c786d2aa3cf0a21b4e9547db2565c566b19c",
+    "Makefile": "15855c303e52c141a16e88ea3b257abe5829e3cebefc03010e5036b742589229",
+    "table/bfield_t10.txt": "fc947c28074590bcbea69314e1edbaaaf855c8f84f24c421d3acb05e7f2cda94"
+  }
+}

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "transport_stats.hpp"
 #include <cmath>
 #include <cstdlib>
 #include <format>
@@ -15,6 +16,7 @@ struct Quad {
   template <class F>
   double
   qags(F& fn, double a, double b, double epsabs, double epsrel) {
+    TRANSPORT_COUNT(quadrature);
     gsl_function gf;
     gf.function = +[](double x, void* p) { return (*static_cast<F*>(p))(x); };
     gf.params = &fn;

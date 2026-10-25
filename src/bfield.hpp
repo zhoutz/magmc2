@@ -3,6 +3,7 @@
 #include "constants.hpp"
 #include "doubles.hpp"
 #include "hunt.hpp"
+#include "interval.hpp"
 #include <cmath>
 #include <format>
 #include <fstream>
@@ -17,6 +18,13 @@ struct BField {
   double mu_min, mu_max;
   int mu_num;
   std::vector<double> f, fp;
+
+  // Conservative bounds for the *interpolated* angular field. Filled once.
+  struct AngularBound {
+    double low, high;
+  };
+  std::vector<AngularBound> angular_bounds;
+  AngularBound global_bound{INFINITY, 0};
 
   BField(std::string fname, double B_pole, double R_star)
       : B_pole(B_pole), R_star(R_star) {
@@ -72,6 +80,73 @@ struct BField {
     }
     if (fin.bad() || !fin.eof())
       fail(line_number + 1, "Error reading table file");
+    for (int i = 0; i + 1 < mu_num; ++i) {
+      double u = std::lerp(mu_min, mu_max, double(i) / (mu_num - 1));
+      double v = std::lerp(mu_min, mu_max, double(i + 1) / (mu_num - 1));
+      Interval br = Interval(fp[i], fp[i + 1]);
+      if (br.lo > br.hi)
+        std::swap(br.lo, br.hi);
+      Interval fv(std::min(f[i], f[i + 1]), std::max(f[i], f[i + 1]));
+      Interval bt = Interval(p) * fv /
+                    Interval(std::sqrt(std::max(0.0, 1 - v * v)),
+                             std::sqrt(std::max(0.0, 1 - u * u)));
+      // At a pole f=0 and sin(theta)=0 simultaneously. Bound the ratio
+      // using the linear interpolant f=k*(1-mu) on the last cell.
+      if (v == 1 && f[i + 1] == 0) {
+        double k = f[i] / (1 - u);
+        bt = Interval(
+            0, Interval::up(std::abs(p * k) * std::sqrt((1 - u) / (1 + u))));
+      }
+      if (fv.lo < 0 || A < 0 || !std::isfinite(bt.hi)) {
+        angular_bounds.push_back({0, INFINITY});
+        continue;
+      }
+      Interval tw(Interval::down(A * std::pow(fv.lo, 1 / p)),
+                  Interval::up(A * std::pow(fv.hi, 1 / p)));
+      auto mag = (br.square() + bt.square() + (tw * bt).square()).sqrt();
+      // Cover the table's floating-point interpolation and libm rounding too.
+      angular_bounds.push_back(
+          {std::max(0.0, mag.lo * (1 - 1e-10)), mag.hi * (1 + 1e-10)});
+    }
+    for (auto const& bound : angular_bounds) {
+      global_bound.low = std::min(global_bound.low, bound.low);
+      global_bound.high = std::max(global_bound.high, bound.high);
+    }
+  }
+
+  Interval
+  strength_bounds(Interval radius, Interval mu) const {
+    mu = mu.abs();
+    if (!(radius.lo > 0) || !(R_star > 0) || !(B_pole > 0) || mu.lo < mu_min ||
+        mu.hi > mu_max)
+      return {0, INFINITY};
+    int i =
+        std::clamp(int((mu.lo - mu_min) / (mu_max - mu_min) * (mu_num - 1)) - 1,
+                   0, mu_num - 2);
+    int j =
+        std::clamp(int((mu.hi - mu_min) / (mu_max - mu_min) * (mu_num - 1)) + 1,
+                   0, mu_num - 2);
+    double low = INFINITY, high = 0;
+    for (; i <= j; ++i) {
+      low = std::min(low, angular_bounds[i].low);
+      high = std::max(high, angular_bounds[i].high);
+    }
+    return Interval(low, high) *
+           Interval(Interval::down(0.5 * B_pole *
+                                   std::pow(R_star / radius.hi, 2 + p)),
+                    Interval::up(0.5 * B_pole *
+                                 std::pow(R_star / radius.lo, 2 + p)));
+  }
+
+  Interval
+  strength_bounds(Interval radius) const {
+    if (!(radius.lo > 0) || !(R_star > 0) || !(B_pole > 0))
+      return {0, INFINITY};
+    return Interval(global_bound.low, global_bound.high) *
+           Interval(Interval::down(0.5 * B_pole *
+                                   std::pow(R_star / radius.hi, 2 + p)),
+                    Interval::up(0.5 * B_pole *
+                                 std::pow(R_star / radius.lo, 2 + p)));
   }
 
   struct BFieldResult {

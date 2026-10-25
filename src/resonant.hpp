@@ -8,6 +8,7 @@
 #include "polarization.hpp"
 #include "quad.hpp"
 #include "ran.hpp"
+#include "transport_stats.hpp"
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -36,6 +37,7 @@ struct ResonantScattering {
   // Distributions and their bounds use signed velocities along B.
   std::tuple<Comps...> components;
   std::array<std::vector<double>, n_components> knots;
+  double min_resonance_energy = INFINITY, max_resonance_energy = 0;
 
   template <class F>
   void
@@ -54,6 +56,22 @@ struct ResonantScattering {
           !std::isfinite(comp.charge_mass_ratio) || comp.charge_mass_ratio <= 0)
         throw std::invalid_argument(
             "Invalid current fraction or charge/mass ratio");
+      if (comp.current_fraction > 0) {
+        double beta =
+            std::max(std::abs(comp.dist.b_min), std::abs(comp.dist.b_max));
+        if (!(beta < 1)) {
+          min_resonance_energy = 0;
+          max_resonance_energy = INFINITY;
+        } else {
+          double max = std::sqrt((1 + beta) / (1 - beta));
+          // Inflate for elementary-function rounding, including x_e scaling.
+          min_resonance_energy =
+              std::min(min_resonance_energy,
+                       (1 - 1e-12) / (max * comp.charge_mass_ratio));
+          max_resonance_energy = std::max(
+              max_resonance_energy, (1 + 1e-12) * max / comp.charge_mass_ratio);
+        }
+      }
       for (int j = 0; j < options.n_knots; ++j)
         knots[i].push_back(std::lerp(comp.dist.b_min, comp.dist.b_max,
                                      double(j) / (options.n_knots - 1)));
@@ -64,6 +82,13 @@ struct ResonantScattering {
     Basis basis;
     double beta;
   };
+
+  bool
+  possible_energy(Interval xe) const {
+    if (std::isnan(xe.lo) || std::isnan(xe.hi))
+      return true;
+    return !(xe.hi < min_resonance_energy || xe.lo > max_resonance_energy);
+  }
 
   static
   double
@@ -120,9 +145,15 @@ struct ResonantScattering {
   template <class Basis>
   Rates
   rates(Basis const& b, Polarization const& pol) const {
+    return rates_at(b, [&] { return pol; });
+  }
+
+  template <class Basis, class PolarizationAt>
+  Rates
+  rates_at(Basis const& b, PolarizationAt const& pol_at) const {
     Rates result{};
-    Stokes sb = pol.in_B(b.c, b.s);
-    double qb = sb.x, v = sb.z;
+    double qb = 0, v = 0;
+    bool have_pol = false;
 
     if (!std::isfinite(b.J) || b.J < 0)
       throw std::runtime_error("Invalid local current density");
@@ -153,6 +184,12 @@ struct ResonantScattering {
         double f = comp.dist.f(beta);
         if (!(beta > -1 && beta < 1) || f == 0)
           continue;
+        if (!have_pol) {
+          Stokes sb = pol_at().in_B(b.c, b.s);
+          qb = sb.x;
+          v = sb.z;
+          have_pol = true;
+        }
         double t = (1 - beta) * (1 + beta);
         // Equivalent to (1-beta*mu)^2(1-beta^2)/abs(mu-beta),
         // but avoids cancellation at coalescing roots.
@@ -197,6 +234,7 @@ struct ResonantScattering {
   template <class BasisAt>
   std::vector<double>
   integration_cuts(double left, double right, BasisAt const& get_basis) const {
+    TRANSPORT_COUNT(cuts);
     std::vector<double> cuts{left, std::midpoint(left, right), right};
     struct ScanPoint {
       double l, xe, mu;
@@ -226,8 +264,10 @@ struct ResonantScattering {
           cuts.push_back(a);
         if (fb == 0)
           cuts.push_back(b);
-        if ((fa < 0 && fb > 0) || (fa > 0 && fb < 0))
+        if ((fa < 0 && fb > 0) || (fa > 0 && fb < 0)) {
+          TRANSPORT_COUNT(roots);
           cuts.push_back(ridders_root(f, a, b, fa, fb));
+        }
         a = b;
         fa = fb;
       }
@@ -261,7 +301,8 @@ struct ResonantScattering {
                           Quad& quad) const {
     auto cuts = integration_cuts(left, right, get_basis);
     auto integrand = [&](double l) {
-      return total_rate(rates(get_basis(l), get_pol(l)));
+      TRANSPORT_COUNT(integrand);
+      return total_rate(rates_at(get_basis(l), [&] { return get_pol(l); }));
     };
     for (size_t j = 0; j + 1 < cuts.size(); ++j) {
       double a = cuts[j], b = cuts[j + 1];

@@ -7,6 +7,7 @@
 #include "polarization.hpp"
 #include "quad.hpp"
 #include "ran.hpp"
+#include "transport_stats.hpp"
 #include <algorithm>
 #include <cmath>
 
@@ -55,6 +56,7 @@ template <PhotonInitializer Init, typename Scat>
 struct PhotonEvolution {
   struct Options {
     double eta_couple = 1e-3, delta_stokes = 1e-3;
+    bool fast_transport = true;
   } options;
 
   BField const& bfield;
@@ -67,6 +69,32 @@ struct PhotonEvolution {
   double3 n, e1, e2;
   double energy_inf, tau;
   Polarization pol;
+  bool possible_scattering = true;
+  bool
+  scattering_possible() const {
+    auto const& st = geodesic.stepper;
+    Interval s(0, std::min(1.0, st.h_old / st.h_dense)), one(1);
+    auto bound = [&](int i) {
+      return Interval(st.rcont1[i]) +
+             s * (Interval(st.rcont2[i]) +
+                  (one - s) * (Interval(st.rcont3[i]) +
+                               s * (Interval(st.rcont4[i]) +
+                                    (one - s) * Interval(st.rcont5[i]))));
+    };
+    auto r = bound(0);
+    if (!(r.lo > geodesic.rs))
+      return true;
+    auto lapse = (one - Interval(geodesic.rs) / r).sqrt();
+    auto energy_scale = Interval(B_to_energy) * lapse / Interval(energy_inf);
+    if (!resonant.possible_energy(bfield.strength_bounds(r) * energy_scale))
+      return false;
+    auto psi = bound(1);
+    auto mu = (psi.cos() * Interval(e1.z) + psi.sin() * Interval(e2.z));
+    mu.lo = std::clamp(mu.lo, -1.0, 1.0);
+    mu.hi = std::clamp(mu.hi, -1.0, 1.0);
+    auto mag = bfield.strength_bounds(r, mu);
+    return resonant.possible_energy(mag * energy_scale);
+  }
 
   PhotonEvolution(double M_star, double R_star, int seed, BField const& bfield,
                   Init const& init, Scat const& scat, Options options = {})
@@ -75,6 +103,7 @@ struct PhotonEvolution {
 
   Basis
   basis(Geodesic::State y) const {
+    TRANSPORT_COUNT(basis);
     auto [r, psi, alpha] = y;
     return Basis(r, psi, alpha, n, e1, e2, bfield, energy_inf, geodesic.rs);
   }
@@ -104,6 +133,10 @@ struct PhotonEvolution {
   bool
   integrate_optical_depth(double left, double right,
                           PolarizationAt const& pol_at) {
+    if (!possible_scattering) {
+      TRANSPORT_COUNT(excluded);
+      return false;
+    }
     auto event = resonant.integrate_optical_depth(
         left, right, [&](double l) { return basis(l); }, pol_at, tau, ran,
         quad);
@@ -147,6 +180,7 @@ struct PhotonEvolution {
   evolve() {
     while (true) {
       int geodesic_event = geodesic.step();
+      possible_scattering = !options.fast_transport || scattering_possible();
       if (pol.is_adiabatic) {
         auto f_couple = [&](double l) {
           Basis b = basis(l);
@@ -166,7 +200,7 @@ struct PhotonEvolution {
         stepper.init(geodesic.l_old(), geodesic.l_new(),
                      0.1 * (geodesic.l_new() - geodesic.l_old()), pol.stokes);
         auto stokes_rotation = [&](double l) { return basis(l).omega; };
-        while (stepper.do_step(stokes_rotation)) {
+        while (stepper.do_step(stokes_rotation, possible_scattering)) {
           if (integrate_optical_depth(
                   stepper.x_old, stepper.x_new,
                   [&](double l) { return Polarization(stepper.interp(l)); }))
@@ -178,10 +212,11 @@ struct PhotonEvolution {
               std::cos(y[2]) > 0 && y[0] > 1e3 * geodesic.R_star;
           double stokes_change = (stepper.y_new - stepper.y_old).length() *
                                  y[0] / (stepper.x_new - stepper.x_old);
-          bool is_resonant_escaped = resonant.resonance_escape(
-              1e-3 * stepper.h_old, basis(stepper.x_old), basis(stepper.x_new));
           if (outward_and_far_enough && stokes_change < options.delta_stokes &&
-              is_resonant_escaped && stepper.phase_advance < pi / 2) {
+              stepper.phase_advance < pi / 2 &&
+              resonant.resonance_escape(1e-3 * stepper.h_old,
+                                        basis(stepper.x_old),
+                                        basis(stepper.x_new))) {
             record_escape(y);
             return EvolveResult::Escaped;
           }

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "polarization.hpp"
+#include "transport_stats.hpp"
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -71,13 +72,15 @@ struct StepperMagnus {
     y_old = y_new = y_init;
     phase_advance = 0;
     prepared = false;
+    dense_ready = false;
   }
 
   // Inspect/integrate optical depth using interp before update_old().
   // false means the initialized interval has been completely committed.
   template <class DerivFunc>
   bool
-  do_step(DerivFunc const& derivs) {
+  do_step(DerivFunc const& derivs, bool dense_output = true) {
+    TRANSPORT_COUNT(magnus);
     if (prepared)
       throw std::logic_error(
           "StepperMagnus requires update_old() before stepping");
@@ -120,20 +123,22 @@ struct StepperMagnus {
 
       // Reuse the four accepted Gauss samples; only three new endpoint
       // evaluations are needed because the two halves share their midpoint.
-      first.omega[0] = coefficient(derivs, x_old);
-      first.omega[3] = second.omega[0] = coefficient(derivs, mid);
-      second.omega[3] = coefficient(derivs, end);
+      if (dense_output) {
+        first.omega[0] = coefficient(derivs, x_old);
+        first.omega[3] = second.omega[0] = coefficient(derivs, mid);
+        second.omega[3] = coefficient(derivs, end);
+      }
       segments = {first, second};
       x_new = end;
       h_old = h;
       h_new = h * factor;
       y_new = second.after;
-      phase_advance =
-          (0.5 * (mid - x_old)) * norm(first.omega[1]) +
-          (0.5 * (mid - x_old)) * norm(first.omega[2]) +
-          (0.5 * (end - mid)) * norm(second.omega[1]) +
-          (0.5 * (end - mid)) * norm(second.omega[2]);
+      phase_advance = (0.5 * (mid - x_old)) * norm(first.omega[1]) +
+                      (0.5 * (mid - x_old)) * norm(first.omega[2]) +
+                      (0.5 * (end - mid)) * norm(second.omega[1]) +
+                      (0.5 * (end - mid)) * norm(second.omega[2]);
       prepared = true;
+      dense_ready = dense_output;
       return true;
     }
   }
@@ -150,9 +155,12 @@ struct StepperMagnus {
 
   Stokes
   interp(double x) const {
+    TRANSPORT_COUNT(polarization);
     if (!prepared)
       throw std::logic_error(
           "StepperMagnus dense output requires an accepted step");
+    if (!dense_ready)
+      throw std::logic_error("StepperMagnus dense output was disabled");
     if (!(x >= x_old && x <= x_new))
       throw std::out_of_range("StepperMagnus dense output outside step");
     return (x <= segments[0].end ? segments[0] : segments[1]).at(x);
@@ -226,6 +234,7 @@ private:
 
   std::array<Segment, 2> segments{};
   bool prepared = false;
+  bool dense_ready = false;
 
   template <class DerivFunc>
   double3
