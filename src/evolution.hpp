@@ -116,7 +116,7 @@ struct PhotonEvolution {
   }
 
   void
-  record_escape(double l, Geodesic::State y) {
+  record_escape(Geodesic::State y) {
     auto [r, psi, alpha] = y;
     double impact = r * std::sin(alpha) / std::sqrt(1 - geodesic.rs / r);
     // u = r/rho maps [r,infinity) to [1,0], with a regular integrand at 0.
@@ -181,7 +181,7 @@ struct PhotonEvolution {
               1e-3 * stepper.h_old, basis(stepper.x_old), basis(stepper.x_new));
           if (is_outward && stokes_change < options.delta_stokes &&
               is_resonant_escaped) {
-            record_escape(stepper.x_new, y);
+            record_escape(y);
             return EvolveResult::Escaped;
           }
           stepper.update_old();
@@ -190,7 +190,7 @@ struct PhotonEvolution {
       if (geodesic_event == 0 && std::cos(geodesic.stepper.y_new[2]) < 0)
         return EvolveResult::Absorbed;
       if (geodesic_event == 1 && std::cos(geodesic.stepper.y_new[2]) > 0) {
-        record_escape(geodesic.l_new(), geodesic.stepper.y_new);
+        record_escape(geodesic.stepper.y_new);
         return EvolveResult::Escaped;
       }
 
