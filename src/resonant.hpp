@@ -2,6 +2,7 @@
 
 #include "constants.hpp"
 #include "doubles.hpp"
+#include "evolution.hpp"
 #include "find_root.hpp"
 #include "geodesic.hpp"
 #include "initialize.hpp"
@@ -47,7 +48,7 @@ struct ResonantScattering {
 
   ResonantScattering(std::tuple<Comps...> components,
                      Options options = Options{})
-      : components(std::move(components)), options(options) {
+      : options(options), components(std::move(components)) {
     if (options.n_knots < 2 || options.n_scan < 1)
       throw std::invalid_argument("Invalid resonance integration grid");
     for_each_component([&](std::size_t i, auto const& comp) {
@@ -61,19 +62,15 @@ struct ResonantScattering {
     });
   }
 
-  struct Event {
-    double l, beta;
-    Polarization incoming;
-    std::size_t icomp;
-    int iroot;
+  struct ScatteredData {
+    Basis basis;
+    double beta;
   };
 
-  template <class Basis>
   static
   double
-  x_e(Basis const& b, double omega_inf, double rs) {
-    double L = std::sqrt(1 - rs / b.r);
-    return B_to_omega * b.Bmag * L / omega_inf;
+  x_e(double Bmag, double energy_local) {
+    return B_to_omega * Bmag / energy_local;
   }
 
   static
@@ -114,8 +111,7 @@ struct ResonantScattering {
 
   template <class Basis>
   Rates
-  rates(Basis const& b, Polarization const& pol, double omega_inf,
-        double rs) const {
+  rates(Basis const& b, Polarization const& pol) const {
     Rates result{};
     Stokes sb = pol.in_B(b.c, b.s);
     double qb = sb.x, v = sb.z;
@@ -132,7 +128,7 @@ struct ResonantScattering {
           "Positive current requires positive magnetic strength");
     // J is J_physical/c, expressed with lengths in km, so rates are per km.
     double current_factor = 4 * pi * pi * b.J / b.Bmag;
-    double xe = x_e(b, omega_inf, rs);
+    double xe = x_e(b.Bmag, b.energy_local);
     for_each_component([&](std::size_t i, auto const& comp) {
       if (comp.current_fraction == 0)
         return;
@@ -191,15 +187,14 @@ struct ResonantScattering {
 
   template <class BasisAt>
   std::vector<double>
-  integration_cuts(double left, double right, BasisAt const& get_basis,
-                   double omega_inf, double rs) const {
+  integration_cuts(double left, double right, BasisAt const& get_basis) const {
     std::vector<double> cuts{left, std::midpoint(left, right), right};
     struct ScanPoint {
       double l, x, mu;
     };
     auto sample = [&](double l) {
       auto b = get_basis(l);
-      return ScanPoint{l, x_e(b, omega_inf, rs), b.mu};
+      return ScanPoint{l, x_e(b.Bmag, b.energy_local), b.mu};
     };
     // All boundary functions share this grid. Cache only the geometry they
     // need; root-finding trial points still evaluate the actual trajectory.
@@ -251,13 +246,13 @@ struct ResonantScattering {
   // retains its value at the beginning of the containing integration segment.
   // The caller applies the returned event and resets tau after scattering.
   template <class BasisAt, class PolarizationAt>
-  std::optional<Event>
+  std::optional<ScatteredData>
   integrate_optical_depth(double left, double right, BasisAt const& get_basis,
-                          PolarizationAt const& pol_at, double omega_inf,
-                          double rs, double& tau, Ran& ran, Quad& quad) const {
-    auto cuts = integration_cuts(left, right, get_basis, omega_inf, rs);
+                          PolarizationAt const& pol_at, double& tau, Ran& ran,
+                          Quad& quad) const {
+    auto cuts = integration_cuts(left, right, get_basis);
     auto integrand = [&](double l) {
-      return total_rate(rates(get_basis(l), pol_at(l), omega_inf, rs));
+      return total_rate(rates(get_basis(l), pol_at(l)));
     };
     for (size_t j = 0; j + 1 < cuts.size(); ++j) {
       double a = cuts[j], b = cuts[j + 1];
@@ -273,11 +268,11 @@ struct ResonantScattering {
       if (dtau > 0 && tau + dtau > 0) {
         // Find the point where the optical depth reaches zero.
         auto residual = [&](double l) { return tau + integral(l); };
-        double l = ridders_root(residual, a, b, tau, tau + dtau);
+        double l =
+            ridders_root(residual, a, b, tau, tau + dtau, 1e-5 * (b - a));
         Polarization incoming = pol_at(l);
-        Rate event =
-            select_rate(rates(get_basis(l), incoming, omega_inf, rs), ran);
-        return Event{l, event.beta, incoming, event.icomp, event.iroot};
+        Rate event = select_rate(rates(get_basis(l), incoming), ran);
+        return ScatteredData{get_basis(l), event.beta};
       }
       tau += dtau;
     }
@@ -292,11 +287,10 @@ struct ResonantScattering {
     if (std::cos(y[2]) <= 0)
       return false; // Infinity reconstruction is only for the outgoing branch.
     auto b = basis(y);
-    double rs = geodesic.rs;
     double h = 1e-3 * geodesic.stepper.h_old;
     auto minus = basis(geodesic.interp(l - h));
-    double xe = x_e(b, omega_inf, rs);
-    double dx = (xe - x_e(minus, omega_inf, rs)) / (h);
+    double xe = x_e(b.Bmag, b.energy_local);
+    double dx = (xe - x_e(minus.Bmag, minus.energy_local)) / (h);
     double dmu = (b.mu - minus.mu) / (h);
     bool escaped = true;
     for_each_component([&](std::size_t, auto const& comp) {
@@ -322,10 +316,12 @@ struct ResonantScattering {
     return std::copysign(m, y);
   }
 
-  template <class Basis>
   static
   InitializedPhoton
-  perform_scattering(Basis b, double beta, double omega_inf, Ran& ran) {
+  perform_scattering(ScatteredData scattered_data, double energy_inf,
+                     Ran& ran) {
+    auto const& b = scattered_data.basis;
+    double beta = scattered_data.beta;
     double mup = sample_mup(ran);
     double mu_out = std::clamp((mup + beta) / (1 + beta * mup), -1.0, 1.0);
     double3 bhat = b.B / b.Bmag;
@@ -335,13 +331,14 @@ struct ResonantScattering {
     double3 normal = cross(b.r_hat, k);
     double cross_len = normal.length();
     normal = cross_len > 1e-14 ? normal / cross_len : ran.unit_perp_to(b.r_hat);
-    double energy = omega_inf * (1 - beta * b.mu) / (1 - beta * mu_out);
+    double energy_inf_new =
+        energy_inf * (1 - beta * b.mu) / (1 - beta * mu_out);
     auto mode = ran.U() < 1 / (1 + mup * mup) ? AdiabaticPolarization::E
                                               : AdiabaticPolarization::O;
     return InitializedPhoton{.n = normal,
                              .e1 = b.r_hat,
                              .e2 = cross(normal, b.r_hat),
-                             .omega_inf = energy,
+                             .energy_inf = energy_inf_new,
                              .r0 = b.r,
                              .psi0 = 0,
                              .alpha0 = std::atan2(cross_len, dot(k, b.r_hat)),

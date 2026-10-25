@@ -10,7 +10,7 @@
 
 struct InitializedPhoton {
   double3 n, e1, e2; // fixed, right-handed orbital basis: e1 x e2 = n
-  double omega_inf;  // photon energy hbar * omega at infinity, in keV
+  double energy_inf; // photon energy hbar * omega at infinity, in keV
   // Radius in km; orbital and propagation angles in radians.
   double r0, psi0, alpha0;
   AdiabaticPolarization pol;
@@ -83,9 +83,9 @@ struct InitFD11 {
   InitializedPhoton
   sample_initial_photon(Ran& ran) const {
     // The Fortran seed routine blueshifts its LOCAL energy. Here we store the
-    // conserved energy at infinity; propagation uses omega_inf/sqrt(1-rs/r).
-    double omega_inf = T_inf * sample_planck_number(ran);
-    if (!std::isfinite(omega_inf) || omega_inf <= 0)
+    // conserved energy at infinity; propagation uses energy_inf/sqrt(1-rs/r).
+    double energy_inf = T_inf * sample_planck_number(ran);
+    if (!std::isfinite(energy_inf) || energy_inf <= 0)
       throw std::runtime_error(
           "Initial photon energy is not finite and positive");
 
@@ -107,6 +107,6 @@ struct InitFD11 {
     AdiabaticPolarization pol = ran.U() < options.e_mode_fraction
                                     ? AdiabaticPolarization::E
                                     : AdiabaticPolarization::O;
-    return {n, e1, e2, omega_inf, R_star, 0, alpha0, pol};
+    return {n, e1, e2, energy_inf, R_star, 0, alpha0, pol};
   }
 };
