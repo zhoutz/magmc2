@@ -68,7 +68,7 @@ struct ResonantScattering {
   static
   double
   x_e(double Bmag, double energy_local) {
-    return B_to_omega * Bmag / energy_local;
+    return B_to_energy * Bmag / energy_local;
   }
 
   static

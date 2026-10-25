@@ -40,7 +40,7 @@ main() {
         photon.perform_scattering();
       } else if (result == decltype(photon)::EvolveResult::Escaped) {
         auto const& e = photon.escape_data;
-        std::println("Escaped: omega_inf={} muk={} Q={} U={} V={}", e.omega_inf,
+        std::println("Escaped: energy_inf={} muk={} Q={} U={} V={}", e.energy_inf,
                      e.muk, e.Q, e.U, e.V);
         break;
       } else {

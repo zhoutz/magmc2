@@ -59,7 +59,7 @@ struct InitFD11 {
   double
   sample_planck_number(Ran& ran) const {
     // FD11 Sections 2.2 and 3.4: sample photon NUMBER, not energy, so
-    // p(x) = x^2 / [2*zeta(3)*(exp(x)-1)], x = omega_inf / T_inf.
+    // p(x) = x^2 / [2*zeta(3)*(exp(x)-1)], x = energy_inf / T_inf.
     // Expanding 1/(exp(x)-1) gives Gamma(shape=3, rate=m) components
     // with probabilities 1/[zeta(3)*m^3], m = 1, 2, ... .
     double m, acceptance;

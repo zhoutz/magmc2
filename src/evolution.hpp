@@ -127,7 +127,7 @@ struct PhotonEvolution {
     double psi_inf = psi + quad.qags(integrand, 0, 1, 1e-11, 1e-11);
     double3 k = to_unit(std::cos(psi_inf) * e1 + std::sin(psi_inf) * e2);
     Stokes sky = pol.observer_stokes(k, n);
-    escape_data = {.omega_inf = energy_inf,
+    escape_data = {.energy_inf = energy_inf,
                    .muk = std::clamp(k.z, -1.0, 1.0),
                    .Q = sky.x,
                    .U = sky.y,
@@ -137,7 +137,7 @@ struct PhotonEvolution {
   enum class EvolveResult { Absorbed, Escaped, Scattered };
 
   struct EscapeData {
-    double omega_inf, muk;
+    double energy_inf, muk;
     double Q, U, V;
   } escape_data;
 
