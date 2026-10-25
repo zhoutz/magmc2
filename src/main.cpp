@@ -28,20 +28,20 @@ main() {
   ResonantScattering resonant(
       std::make_tuple(powerlaw_electron, powerlaw_positron));
 
-  PhotonEvolution photon(M_star, R_star, 42, bfield, initializer, resonant);
-
-  int N = 100;
-  while (N--) {
+  int N = 1000;
+  for (int i = 0; i < N; ++i) {
+    PhotonEvolution photon(M_star, R_star, 42 + i, bfield, initializer,
+                           resonant);
     photon.init();
     while (true) {
       auto result = photon.evolve();
       if (result == decltype(photon)::EvolveResult::Scattered) {
-        std::println("Scattered: beta={}", photon.scatter_data.beta);
+        // std::println("Scattered: beta={}", photon.scatter_data.beta);
         photon.perform_scattering();
       } else if (result == decltype(photon)::EvolveResult::Escaped) {
         auto const& e = photon.escape_data;
-        std::println("Escaped: energy_inf={} muk={} Q={} U={} V={}", e.energy_inf,
-                     e.muk, e.Q, e.U, e.V);
+        std::println("Escaped: energy_inf={} muk={} Q={} U={} V={}",
+                     e.energy_inf, e.muk, e.Q, e.U, e.V);
         break;
       } else {
         std::println("Absorbed");
