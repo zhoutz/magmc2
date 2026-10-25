@@ -45,6 +45,9 @@ struct Rotation {
 struct StepperMagnus {
   double x_old = 0, x_new = 0, x_max = 0;
   double h_old = 0, h_new = 0;
+  // Integral of |omega| over the latest accepted step, in radians.
+  // Estimated from the accepted Gauss samples; not the net rotation angle.
+  double phase_advance = 0;
   Stokes y_old{}, y_new{};
   double atol, rtol;
 
@@ -66,6 +69,7 @@ struct StepperMagnus {
     x_max = x_end;
     h_old = h_new = h_init;
     y_old = y_new = y_init;
+    phase_advance = 0;
     prepared = false;
   }
 
@@ -124,6 +128,11 @@ struct StepperMagnus {
       h_old = h;
       h_new = h * factor;
       y_new = second.after;
+      phase_advance =
+          (0.5 * (mid - x_old)) * norm(first.omega[1]) +
+          (0.5 * (mid - x_old)) * norm(first.omega[2]) +
+          (0.5 * (end - mid)) * norm(second.omega[1]) +
+          (0.5 * (end - mid)) * norm(second.omega[2]);
       prepared = true;
       return true;
     }

@@ -174,13 +174,14 @@ struct PhotonEvolution {
 
           pol.set_stokes(stepper.y_new);
           Geodesic::State y = geodesic.interp(stepper.x_new);
-          bool is_outward = std::cos(y[2]) > 0;
+          bool outward_and_far_enough =
+              std::cos(y[2]) > 0 && y[0] > 1e3 * geodesic.R_star;
           double stokes_change = (stepper.y_new - stepper.y_old).length() *
                                  y[0] / (stepper.x_new - stepper.x_old);
           bool is_resonant_escaped = resonant.resonance_escape(
               1e-3 * stepper.h_old, basis(stepper.x_old), basis(stepper.x_new));
-          if (is_outward && stokes_change < options.delta_stokes &&
-              is_resonant_escaped) {
+          if (outward_and_far_enough && stokes_change < options.delta_stokes &&
+              is_resonant_escaped && stepper.phase_advance < pi / 2) {
             record_escape(y);
             return EvolveResult::Escaped;
           }
