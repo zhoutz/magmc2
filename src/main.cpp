@@ -30,7 +30,7 @@ main() {
 
   PhotonEvolution photon(M_star, R_star, 42, bfield, initializer, resonant);
 
-  int N = 5;
+  int N = 100;
   while (N--) {
     photon.init();
     while (true) {
