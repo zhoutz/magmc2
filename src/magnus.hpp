@@ -14,7 +14,10 @@ struct Rotation {
   static
   Rotation
   exponential(double3 a) {
-    double angle = std::hypot(a.x, a.y, a.z);
+    double angle = a.length();
+    if (!std::isfinite(angle) ||
+        (angle == 0 && (a.x != 0 || a.y != 0 || a.z != 0)))
+      angle = std::hypot(a.x, a.y, a.z);
     if (!std::isfinite(angle))
       throw std::runtime_error("Non-finite rotation in StepperMagnus");
     double scale =
@@ -77,7 +80,7 @@ struct StepperMagnus {
   // false means the initialized interval has been completely committed.
   template <class DerivFunc>
   bool
-  do_step(DerivFunc const& derivs) {
+  do_step(DerivFunc const& derivs, bool dense_output = true) {
     if (prepared)
       throw std::logic_error(
           "StepperMagnus requires update_old() before stepping");
@@ -120,19 +123,21 @@ struct StepperMagnus {
 
       // Reuse the four accepted Gauss samples; only three new endpoint
       // evaluations are needed because the two halves share their midpoint.
-      first.omega[0] = coefficient(derivs, x_old);
-      first.omega[3] = second.omega[0] = coefficient(derivs, mid);
-      second.omega[3] = coefficient(derivs, end);
-      segments = {first, second};
+      if (dense_output) {
+        first.omega[0] = coefficient(derivs, x_old);
+        first.omega[3] = second.omega[0] = coefficient(derivs, mid);
+        second.omega[3] = coefficient(derivs, end);
+        segments = {first, second};
+      }
+      dense_prepared = dense_output;
       x_new = end;
       h_old = h;
       h_new = h * factor;
       y_new = second.after;
-      phase_advance =
-          (0.5 * (mid - x_old)) * norm(first.omega[1]) +
-          (0.5 * (mid - x_old)) * norm(first.omega[2]) +
-          (0.5 * (end - mid)) * norm(second.omega[1]) +
-          (0.5 * (end - mid)) * norm(second.omega[2]);
+      phase_advance = (0.5 * (mid - x_old)) * norm(first.omega[1]) +
+                      (0.5 * (mid - x_old)) * norm(first.omega[2]) +
+                      (0.5 * (end - mid)) * norm(second.omega[1]) +
+                      (0.5 * (end - mid)) * norm(second.omega[2]);
       prepared = true;
       return true;
     }
@@ -150,7 +155,7 @@ struct StepperMagnus {
 
   Stokes
   interp(double x) const {
-    if (!prepared)
+    if (!prepared || !dense_prepared)
       throw std::logic_error(
           "StepperMagnus dense output requires an accepted step");
     if (!(x >= x_old && x <= x_new))
@@ -171,7 +176,11 @@ private:
   static
   double
   norm(double3 s) {
-    return std::hypot(s.x, s.y, s.z);
+    double value = s.length();
+    return std::isfinite(value) &&
+                   (value != 0 || (s.x == 0 && s.y == 0 && s.z == 0))
+               ? value
+               : std::hypot(s.x, s.y, s.z);
   }
 
   void
@@ -226,6 +235,7 @@ private:
 
   std::array<Segment, 2> segments{};
   bool prepared = false;
+  bool dense_prepared = false;
 
   template <class DerivFunc>
   double3

@@ -1,0 +1,769 @@
+{
+  "date": "2026-10-26",
+  "method": "three serial rounds; median user CPU; leave-one-out vs full; core vs baseline",
+  "manifest": {
+    "flags": [
+      "-std=c++23",
+      "-O3",
+      "-march=native",
+      "-Wall",
+      "-Wextra",
+      "-Wpedantic",
+      "-I/opt/homebrew/include",
+      "-L/opt/homebrew/lib",
+      "-lstdc++exp",
+      "-lgsl",
+      "-lgslcblas"
+    ],
+    "compiler": "g++-16 (Homebrew GCC 16.2.0) 16.2.0",
+    "hashes": {
+      "full/find_root.hpp": "28c9c951a5b59dc355f1182c4b772c0bf9807ab586bd2330cbe524a02dec9da2",
+      "full/evolution.hpp": "36296109c7dec54715e13b514d069ed8a17532cacae5feeb3d22ab84ebca9189",
+      "full/bfield.hpp": "6513c80698ee79fcccbe3e13bdb4fd99d2d2e77a21e214fa6f60b06c0350ddaf",
+      "full/doubles.hpp": "6c23d8bd4cb5a8427dc319740f68e925ba6bab9544fdc20b648537520da4db6b",
+      "full/bessel_K1_scaled.hpp": "17988f3be1a5c7089eaf630278512466c2a6350579b09a53a5f7b2a4177473e0",
+      "full/component.hpp": "3a114ef970d8782422b2ac51fc048999623f345747817b87387d9e830658940c",
+      "full/resonant.hpp": "5ec13151f9dc496615dd04a0d3b2902f9f6cd195ae09128888740dd0d438200c",
+      "full/geodesic.hpp": "a469adf4ce23f4999075ee06b4d26aaa07126cc288188ef12f59eb42fe50d429",
+      "full/constants.hpp": "73b657af37449485a732df7d74b8f932e17974ac613ac703f4bd1ccd4fb9a035",
+      "full/quad.hpp": "b38a4d69d925a4541bb7d6f8677fb4fe2dfeb9329a9ca2c75fc4bc673f8b9cf7",
+      "full/ran.hpp": "f48e7a15dc4f93057996630a9f9d500e3c3a24a3a3817c5710173bc87b450131",
+      "full/magnus.hpp": "710e4277d632b4d0deabbef9644a778f985289477bab8aa51650959a0ab79430",
+      "full/distribution.hpp": "8ac7b7b2c25be1737e55bcbc2b5f1e15f864c49e6951d17736c869a32f23310d",
+      "full/rotation_cache.hpp": "f9f1889cf8bceb3e96e6fa1700d1672fa7642821114009867d13fcb476747367",
+      "full/polarization.hpp": "f088c07346b6ca018dad24d8d56a3eba03c69a10e973c2b800c9fee89c6e8812",
+      "full/dopr5.hpp": "b219c4cda370dcd95a3ebcef5b69db70e3beb30cd74f4cf5958aaa46cc285451",
+      "full/initialize.hpp": "95a1c8f40a8e71e5691023fd19e0734277ef7aa54901a76512b133aef6ffff78",
+      "full/hunt.hpp": "675c77c6364dc9625dd00a149154c786d2aa3cf0a21b4e9547db2565c566b19c",
+      "bounds/find_root.hpp": "28c9c951a5b59dc355f1182c4b772c0bf9807ab586bd2330cbe524a02dec9da2",
+      "bounds/evolution.hpp": "2a49821466a87da87b1ca63be6015532bd73618e4e01113e69cd1a9176ba54f4",
+      "bounds/bfield.hpp": "6513c80698ee79fcccbe3e13bdb4fd99d2d2e77a21e214fa6f60b06c0350ddaf",
+      "bounds/doubles.hpp": "6c23d8bd4cb5a8427dc319740f68e925ba6bab9544fdc20b648537520da4db6b",
+      "bounds/bessel_K1_scaled.hpp": "17988f3be1a5c7089eaf630278512466c2a6350579b09a53a5f7b2a4177473e0",
+      "bounds/component.hpp": "3a114ef970d8782422b2ac51fc048999623f345747817b87387d9e830658940c",
+      "bounds/resonant.hpp": "5ec13151f9dc496615dd04a0d3b2902f9f6cd195ae09128888740dd0d438200c",
+      "bounds/geodesic.hpp": "a469adf4ce23f4999075ee06b4d26aaa07126cc288188ef12f59eb42fe50d429",
+      "bounds/constants.hpp": "73b657af37449485a732df7d74b8f932e17974ac613ac703f4bd1ccd4fb9a035",
+      "bounds/quad.hpp": "b38a4d69d925a4541bb7d6f8677fb4fe2dfeb9329a9ca2c75fc4bc673f8b9cf7",
+      "bounds/ran.hpp": "f48e7a15dc4f93057996630a9f9d500e3c3a24a3a3817c5710173bc87b450131",
+      "bounds/magnus.hpp": "710e4277d632b4d0deabbef9644a778f985289477bab8aa51650959a0ab79430",
+      "bounds/distribution.hpp": "8ac7b7b2c25be1737e55bcbc2b5f1e15f864c49e6951d17736c869a32f23310d",
+      "bounds/rotation_cache.hpp": "f9f1889cf8bceb3e96e6fa1700d1672fa7642821114009867d13fcb476747367",
+      "bounds/polarization.hpp": "f088c07346b6ca018dad24d8d56a3eba03c69a10e973c2b800c9fee89c6e8812",
+      "bounds/dopr5.hpp": "b219c4cda370dcd95a3ebcef5b69db70e3beb30cd74f4cf5958aaa46cc285451",
+      "bounds/initialize.hpp": "95a1c8f40a8e71e5691023fd19e0734277ef7aa54901a76512b133aef6ffff78",
+      "bounds/hunt.hpp": "675c77c6364dc9625dd00a149154c786d2aa3cf0a21b4e9547db2565c566b19c",
+      "locator/find_root.hpp": "28c9c951a5b59dc355f1182c4b772c0bf9807ab586bd2330cbe524a02dec9da2",
+      "locator/evolution.hpp": "36296109c7dec54715e13b514d069ed8a17532cacae5feeb3d22ab84ebca9189",
+      "locator/bfield.hpp": "6513c80698ee79fcccbe3e13bdb4fd99d2d2e77a21e214fa6f60b06c0350ddaf",
+      "locator/doubles.hpp": "6c23d8bd4cb5a8427dc319740f68e925ba6bab9544fdc20b648537520da4db6b",
+      "locator/bessel_K1_scaled.hpp": "17988f3be1a5c7089eaf630278512466c2a6350579b09a53a5f7b2a4177473e0",
+      "locator/component.hpp": "3a114ef970d8782422b2ac51fc048999623f345747817b87387d9e830658940c",
+      "locator/resonant.hpp": "3324b73e6f11ecfc21621af903fe1e2301a94268c9d9e143395f500ba22d5f53",
+      "locator/geodesic.hpp": "a469adf4ce23f4999075ee06b4d26aaa07126cc288188ef12f59eb42fe50d429",
+      "locator/constants.hpp": "73b657af37449485a732df7d74b8f932e17974ac613ac703f4bd1ccd4fb9a035",
+      "locator/quad.hpp": "b38a4d69d925a4541bb7d6f8677fb4fe2dfeb9329a9ca2c75fc4bc673f8b9cf7",
+      "locator/ran.hpp": "f48e7a15dc4f93057996630a9f9d500e3c3a24a3a3817c5710173bc87b450131",
+      "locator/magnus.hpp": "710e4277d632b4d0deabbef9644a778f985289477bab8aa51650959a0ab79430",
+      "locator/distribution.hpp": "8ac7b7b2c25be1737e55bcbc2b5f1e15f864c49e6951d17736c869a32f23310d",
+      "locator/rotation_cache.hpp": "f9f1889cf8bceb3e96e6fa1700d1672fa7642821114009867d13fcb476747367",
+      "locator/polarization.hpp": "f088c07346b6ca018dad24d8d56a3eba03c69a10e973c2b800c9fee89c6e8812",
+      "locator/dopr5.hpp": "b219c4cda370dcd95a3ebcef5b69db70e3beb30cd74f4cf5958aaa46cc285451",
+      "locator/initialize.hpp": "95a1c8f40a8e71e5691023fd19e0734277ef7aa54901a76512b133aef6ffff78",
+      "locator/hunt.hpp": "675c77c6364dc9625dd00a149154c786d2aa3cf0a21b4e9547db2565c566b19c",
+      "core/find_root.hpp": "28c9c951a5b59dc355f1182c4b772c0bf9807ab586bd2330cbe524a02dec9da2",
+      "core/evolution.hpp": "98c538b2aac953bdad913132662015dd86eee7f7a019371f4091e848af0604c1",
+      "core/bfield.hpp": "6513c80698ee79fcccbe3e13bdb4fd99d2d2e77a21e214fa6f60b06c0350ddaf",
+      "core/doubles.hpp": "6c23d8bd4cb5a8427dc319740f68e925ba6bab9544fdc20b648537520da4db6b",
+      "core/bessel_K1_scaled.hpp": "17988f3be1a5c7089eaf630278512466c2a6350579b09a53a5f7b2a4177473e0",
+      "core/component.hpp": "3a114ef970d8782422b2ac51fc048999623f345747817b87387d9e830658940c",
+      "core/resonant.hpp": "0c0a9c9ef38bf2c62f3cd360646fabe8e712e89843da16e42ff6055933082ce8",
+      "core/geodesic.hpp": "a469adf4ce23f4999075ee06b4d26aaa07126cc288188ef12f59eb42fe50d429",
+      "core/constants.hpp": "73b657af37449485a732df7d74b8f932e17974ac613ac703f4bd1ccd4fb9a035",
+      "core/quad.hpp": "b38a4d69d925a4541bb7d6f8677fb4fe2dfeb9329a9ca2c75fc4bc673f8b9cf7",
+      "core/ran.hpp": "f48e7a15dc4f93057996630a9f9d500e3c3a24a3a3817c5710173bc87b450131",
+      "core/magnus.hpp": "6095a27de31c645726202b2cd678ee483f62b762b06176983b15f33e4457dec6",
+      "core/distribution.hpp": "8ac7b7b2c25be1737e55bcbc2b5f1e15f864c49e6951d17736c869a32f23310d",
+      "core/rotation_cache.hpp": "f9f1889cf8bceb3e96e6fa1700d1672fa7642821114009867d13fcb476747367",
+      "core/polarization.hpp": "f088c07346b6ca018dad24d8d56a3eba03c69a10e973c2b800c9fee89c6e8812",
+      "core/dopr5.hpp": "b219c4cda370dcd95a3ebcef5b69db70e3beb30cd74f4cf5958aaa46cc285451",
+      "core/initialize.hpp": "95a1c8f40a8e71e5691023fd19e0734277ef7aa54901a76512b133aef6ffff78",
+      "core/hunt.hpp": "675c77c6364dc9625dd00a149154c786d2aa3cf0a21b4e9547db2565c566b19c",
+      "cache/find_root.hpp": "28c9c951a5b59dc355f1182c4b772c0bf9807ab586bd2330cbe524a02dec9da2",
+      "cache/evolution.hpp": "c7e743180dd9066a07af3d4baf300bc90087d2aaa4d2d5c737813686e4157af1",
+      "cache/bfield.hpp": "6513c80698ee79fcccbe3e13bdb4fd99d2d2e77a21e214fa6f60b06c0350ddaf",
+      "cache/doubles.hpp": "6c23d8bd4cb5a8427dc319740f68e925ba6bab9544fdc20b648537520da4db6b",
+      "cache/bessel_K1_scaled.hpp": "17988f3be1a5c7089eaf630278512466c2a6350579b09a53a5f7b2a4177473e0",
+      "cache/component.hpp": "3a114ef970d8782422b2ac51fc048999623f345747817b87387d9e830658940c",
+      "cache/resonant.hpp": "5ec13151f9dc496615dd04a0d3b2902f9f6cd195ae09128888740dd0d438200c",
+      "cache/geodesic.hpp": "a469adf4ce23f4999075ee06b4d26aaa07126cc288188ef12f59eb42fe50d429",
+      "cache/constants.hpp": "73b657af37449485a732df7d74b8f932e17974ac613ac703f4bd1ccd4fb9a035",
+      "cache/quad.hpp": "b38a4d69d925a4541bb7d6f8677fb4fe2dfeb9329a9ca2c75fc4bc673f8b9cf7",
+      "cache/ran.hpp": "f48e7a15dc4f93057996630a9f9d500e3c3a24a3a3817c5710173bc87b450131",
+      "cache/magnus.hpp": "710e4277d632b4d0deabbef9644a778f985289477bab8aa51650959a0ab79430",
+      "cache/distribution.hpp": "8ac7b7b2c25be1737e55bcbc2b5f1e15f864c49e6951d17736c869a32f23310d",
+      "cache/rotation_cache.hpp": "f9f1889cf8bceb3e96e6fa1700d1672fa7642821114009867d13fcb476747367",
+      "cache/polarization.hpp": "f088c07346b6ca018dad24d8d56a3eba03c69a10e973c2b800c9fee89c6e8812",
+      "cache/dopr5.hpp": "b219c4cda370dcd95a3ebcef5b69db70e3beb30cd74f4cf5958aaa46cc285451",
+      "cache/initialize.hpp": "95a1c8f40a8e71e5691023fd19e0734277ef7aa54901a76512b133aef6ffff78",
+      "cache/hunt.hpp": "675c77c6364dc9625dd00a149154c786d2aa3cf0a21b4e9547db2565c566b19c",
+      "initial_step/find_root.hpp": "28c9c951a5b59dc355f1182c4b772c0bf9807ab586bd2330cbe524a02dec9da2",
+      "initial_step/evolution.hpp": "a18f33691030c178a55b7766e1e60c5d0e7839760b44d4e638864e7875b8804c",
+      "initial_step/bfield.hpp": "6513c80698ee79fcccbe3e13bdb4fd99d2d2e77a21e214fa6f60b06c0350ddaf",
+      "initial_step/doubles.hpp": "6c23d8bd4cb5a8427dc319740f68e925ba6bab9544fdc20b648537520da4db6b",
+      "initial_step/bessel_K1_scaled.hpp": "17988f3be1a5c7089eaf630278512466c2a6350579b09a53a5f7b2a4177473e0",
+      "initial_step/component.hpp": "3a114ef970d8782422b2ac51fc048999623f345747817b87387d9e830658940c",
+      "initial_step/resonant.hpp": "5ec13151f9dc496615dd04a0d3b2902f9f6cd195ae09128888740dd0d438200c",
+      "initial_step/geodesic.hpp": "a469adf4ce23f4999075ee06b4d26aaa07126cc288188ef12f59eb42fe50d429",
+      "initial_step/constants.hpp": "73b657af37449485a732df7d74b8f932e17974ac613ac703f4bd1ccd4fb9a035",
+      "initial_step/quad.hpp": "b38a4d69d925a4541bb7d6f8677fb4fe2dfeb9329a9ca2c75fc4bc673f8b9cf7",
+      "initial_step/ran.hpp": "f48e7a15dc4f93057996630a9f9d500e3c3a24a3a3817c5710173bc87b450131",
+      "initial_step/magnus.hpp": "710e4277d632b4d0deabbef9644a778f985289477bab8aa51650959a0ab79430",
+      "initial_step/distribution.hpp": "8ac7b7b2c25be1737e55bcbc2b5f1e15f864c49e6951d17736c869a32f23310d",
+      "initial_step/rotation_cache.hpp": "f9f1889cf8bceb3e96e6fa1700d1672fa7642821114009867d13fcb476747367",
+      "initial_step/polarization.hpp": "f088c07346b6ca018dad24d8d56a3eba03c69a10e973c2b800c9fee89c6e8812",
+      "initial_step/dopr5.hpp": "b219c4cda370dcd95a3ebcef5b69db70e3beb30cd74f4cf5958aaa46cc285451",
+      "initial_step/initialize.hpp": "95a1c8f40a8e71e5691023fd19e0734277ef7aa54901a76512b133aef6ffff78",
+      "initial_step/hunt.hpp": "675c77c6364dc9625dd00a149154c786d2aa3cf0a21b4e9547db2565c566b19c",
+      "dense/find_root.hpp": "28c9c951a5b59dc355f1182c4b772c0bf9807ab586bd2330cbe524a02dec9da2",
+      "dense/evolution.hpp": "118c6f0d8fd4d7bf1c84e2df1c248a1953dedb1fd08e7c1a39f4589ace9bfc93",
+      "dense/bfield.hpp": "6513c80698ee79fcccbe3e13bdb4fd99d2d2e77a21e214fa6f60b06c0350ddaf",
+      "dense/doubles.hpp": "6c23d8bd4cb5a8427dc319740f68e925ba6bab9544fdc20b648537520da4db6b",
+      "dense/bessel_K1_scaled.hpp": "17988f3be1a5c7089eaf630278512466c2a6350579b09a53a5f7b2a4177473e0",
+      "dense/component.hpp": "3a114ef970d8782422b2ac51fc048999623f345747817b87387d9e830658940c",
+      "dense/resonant.hpp": "5ec13151f9dc496615dd04a0d3b2902f9f6cd195ae09128888740dd0d438200c",
+      "dense/geodesic.hpp": "a469adf4ce23f4999075ee06b4d26aaa07126cc288188ef12f59eb42fe50d429",
+      "dense/constants.hpp": "73b657af37449485a732df7d74b8f932e17974ac613ac703f4bd1ccd4fb9a035",
+      "dense/quad.hpp": "b38a4d69d925a4541bb7d6f8677fb4fe2dfeb9329a9ca2c75fc4bc673f8b9cf7",
+      "dense/ran.hpp": "f48e7a15dc4f93057996630a9f9d500e3c3a24a3a3817c5710173bc87b450131",
+      "dense/magnus.hpp": "710e4277d632b4d0deabbef9644a778f985289477bab8aa51650959a0ab79430",
+      "dense/distribution.hpp": "8ac7b7b2c25be1737e55bcbc2b5f1e15f864c49e6951d17736c869a32f23310d",
+      "dense/rotation_cache.hpp": "f9f1889cf8bceb3e96e6fa1700d1672fa7642821114009867d13fcb476747367",
+      "dense/polarization.hpp": "f088c07346b6ca018dad24d8d56a3eba03c69a10e973c2b800c9fee89c6e8812",
+      "dense/dopr5.hpp": "b219c4cda370dcd95a3ebcef5b69db70e3beb30cd74f4cf5958aaa46cc285451",
+      "dense/initialize.hpp": "95a1c8f40a8e71e5691023fd19e0734277ef7aa54901a76512b133aef6ffff78",
+      "dense/hunt.hpp": "675c77c6364dc9625dd00a149154c786d2aa3cf0a21b4e9547db2565c566b19c",
+      "baseline/find_root.hpp": "e7f7db78e9c52152445f70351e4c0cd0b66cf95f6d1c449709fbf66387393d26",
+      "baseline/evolution.hpp": "722d8301f8e9931802b6da16831a2786d197cf7a1e51dc27d3d70e13ecee3bfe",
+      "baseline/bfield.hpp": "3556b92fea56c7d34527d9d18f796e641c29fa30d3400252d512f726ae38806a",
+      "baseline/doubles.hpp": "6c23d8bd4cb5a8427dc319740f68e925ba6bab9544fdc20b648537520da4db6b",
+      "baseline/bessel_K1_scaled.hpp": "17988f3be1a5c7089eaf630278512466c2a6350579b09a53a5f7b2a4177473e0",
+      "baseline/component.hpp": "3a114ef970d8782422b2ac51fc048999623f345747817b87387d9e830658940c",
+      "baseline/resonant.hpp": "58261d184e87560860a6776fcc7005ac64bbc21cc90982fffe8ae83041e58e3c",
+      "baseline/geodesic.hpp": "aec0ccd45a6201f454870b772982362b142717d0bb83b6fc2b575bde176fad52",
+      "baseline/constants.hpp": "73b657af37449485a732df7d74b8f932e17974ac613ac703f4bd1ccd4fb9a035",
+      "baseline/quad.hpp": "f703b8b39a4ccd80f602d3a9aaec91152516b1898ff5e1620293c8e6c0001897",
+      "baseline/ran.hpp": "f48e7a15dc4f93057996630a9f9d500e3c3a24a3a3817c5710173bc87b450131",
+      "baseline/magnus.hpp": "806a031a8ac06e5d1c13e696e47c6db19095d0994c2241e42c33b2579606b71c",
+      "baseline/distribution.hpp": "8ac7b7b2c25be1737e55bcbc2b5f1e15f864c49e6951d17736c869a32f23310d",
+      "baseline/polarization.hpp": "f088c07346b6ca018dad24d8d56a3eba03c69a10e973c2b800c9fee89c6e8812",
+      "baseline/dopr5.hpp": "b219c4cda370dcd95a3ebcef5b69db70e3beb30cd74f4cf5958aaa46cc285451",
+      "baseline/initialize.hpp": "95a1c8f40a8e71e5691023fd19e0734277ef7aa54901a76512b133aef6ffff78",
+      "baseline/hunt.hpp": "675c77c6364dc9625dd00a149154c786d2aa3cf0a21b4e9547db2565c566b19c",
+      "quadrature/find_root.hpp": "28c9c951a5b59dc355f1182c4b772c0bf9807ab586bd2330cbe524a02dec9da2",
+      "quadrature/evolution.hpp": "36296109c7dec54715e13b514d069ed8a17532cacae5feeb3d22ab84ebca9189",
+      "quadrature/bfield.hpp": "6513c80698ee79fcccbe3e13bdb4fd99d2d2e77a21e214fa6f60b06c0350ddaf",
+      "quadrature/doubles.hpp": "6c23d8bd4cb5a8427dc319740f68e925ba6bab9544fdc20b648537520da4db6b",
+      "quadrature/bessel_K1_scaled.hpp": "17988f3be1a5c7089eaf630278512466c2a6350579b09a53a5f7b2a4177473e0",
+      "quadrature/component.hpp": "3a114ef970d8782422b2ac51fc048999623f345747817b87387d9e830658940c",
+      "quadrature/resonant.hpp": "be50a054f2e2eca92272001b4376ac1fc3a54968ec96347def339e209454ec43",
+      "quadrature/geodesic.hpp": "a469adf4ce23f4999075ee06b4d26aaa07126cc288188ef12f59eb42fe50d429",
+      "quadrature/constants.hpp": "73b657af37449485a732df7d74b8f932e17974ac613ac703f4bd1ccd4fb9a035",
+      "quadrature/quad.hpp": "b38a4d69d925a4541bb7d6f8677fb4fe2dfeb9329a9ca2c75fc4bc673f8b9cf7",
+      "quadrature/ran.hpp": "f48e7a15dc4f93057996630a9f9d500e3c3a24a3a3817c5710173bc87b450131",
+      "quadrature/magnus.hpp": "710e4277d632b4d0deabbef9644a778f985289477bab8aa51650959a0ab79430",
+      "quadrature/distribution.hpp": "8ac7b7b2c25be1737e55bcbc2b5f1e15f864c49e6951d17736c869a32f23310d",
+      "quadrature/rotation_cache.hpp": "f9f1889cf8bceb3e96e6fa1700d1672fa7642821114009867d13fcb476747367",
+      "quadrature/polarization.hpp": "f088c07346b6ca018dad24d8d56a3eba03c69a10e973c2b800c9fee89c6e8812",
+      "quadrature/dopr5.hpp": "b219c4cda370dcd95a3ebcef5b69db70e3beb30cd74f4cf5958aaa46cc285451",
+      "quadrature/initialize.hpp": "95a1c8f40a8e71e5691023fd19e0734277ef7aa54901a76512b133aef6ffff78",
+      "quadrature/hunt.hpp": "675c77c6364dc9625dd00a149154c786d2aa3cf0a21b4e9547db2565c566b19c",
+      "norm/find_root.hpp": "28c9c951a5b59dc355f1182c4b772c0bf9807ab586bd2330cbe524a02dec9da2",
+      "norm/evolution.hpp": "36296109c7dec54715e13b514d069ed8a17532cacae5feeb3d22ab84ebca9189",
+      "norm/bfield.hpp": "6513c80698ee79fcccbe3e13bdb4fd99d2d2e77a21e214fa6f60b06c0350ddaf",
+      "norm/doubles.hpp": "6c23d8bd4cb5a8427dc319740f68e925ba6bab9544fdc20b648537520da4db6b",
+      "norm/bessel_K1_scaled.hpp": "17988f3be1a5c7089eaf630278512466c2a6350579b09a53a5f7b2a4177473e0",
+      "norm/component.hpp": "3a114ef970d8782422b2ac51fc048999623f345747817b87387d9e830658940c",
+      "norm/resonant.hpp": "5ec13151f9dc496615dd04a0d3b2902f9f6cd195ae09128888740dd0d438200c",
+      "norm/geodesic.hpp": "a469adf4ce23f4999075ee06b4d26aaa07126cc288188ef12f59eb42fe50d429",
+      "norm/constants.hpp": "73b657af37449485a732df7d74b8f932e17974ac613ac703f4bd1ccd4fb9a035",
+      "norm/quad.hpp": "b38a4d69d925a4541bb7d6f8677fb4fe2dfeb9329a9ca2c75fc4bc673f8b9cf7",
+      "norm/ran.hpp": "f48e7a15dc4f93057996630a9f9d500e3c3a24a3a3817c5710173bc87b450131",
+      "norm/magnus.hpp": "6095a27de31c645726202b2cd678ee483f62b762b06176983b15f33e4457dec6",
+      "norm/distribution.hpp": "8ac7b7b2c25be1737e55bcbc2b5f1e15f864c49e6951d17736c869a32f23310d",
+      "norm/rotation_cache.hpp": "f9f1889cf8bceb3e96e6fa1700d1672fa7642821114009867d13fcb476747367",
+      "norm/polarization.hpp": "f088c07346b6ca018dad24d8d56a3eba03c69a10e973c2b800c9fee89c6e8812",
+      "norm/dopr5.hpp": "b219c4cda370dcd95a3ebcef5b69db70e3beb30cd74f4cf5958aaa46cc285451",
+      "norm/initialize.hpp": "95a1c8f40a8e71e5691023fd19e0734277ef7aa54901a76512b133aef6ffff78",
+      "norm/hunt.hpp": "675c77c6364dc9625dd00a149154c786d2aa3cf0a21b4e9547db2565c566b19c",
+      "cuts/find_root.hpp": "28c9c951a5b59dc355f1182c4b772c0bf9807ab586bd2330cbe524a02dec9da2",
+      "cuts/evolution.hpp": "4262105aece4f8cf711b7eb59488589a1df0f7c1acd74245011b3bdf41be6e64",
+      "cuts/bfield.hpp": "6513c80698ee79fcccbe3e13bdb4fd99d2d2e77a21e214fa6f60b06c0350ddaf",
+      "cuts/doubles.hpp": "6c23d8bd4cb5a8427dc319740f68e925ba6bab9544fdc20b648537520da4db6b",
+      "cuts/bessel_K1_scaled.hpp": "17988f3be1a5c7089eaf630278512466c2a6350579b09a53a5f7b2a4177473e0",
+      "cuts/component.hpp": "3a114ef970d8782422b2ac51fc048999623f345747817b87387d9e830658940c",
+      "cuts/resonant.hpp": "5ec13151f9dc496615dd04a0d3b2902f9f6cd195ae09128888740dd0d438200c",
+      "cuts/geodesic.hpp": "a469adf4ce23f4999075ee06b4d26aaa07126cc288188ef12f59eb42fe50d429",
+      "cuts/constants.hpp": "73b657af37449485a732df7d74b8f932e17974ac613ac703f4bd1ccd4fb9a035",
+      "cuts/quad.hpp": "b38a4d69d925a4541bb7d6f8677fb4fe2dfeb9329a9ca2c75fc4bc673f8b9cf7",
+      "cuts/ran.hpp": "f48e7a15dc4f93057996630a9f9d500e3c3a24a3a3817c5710173bc87b450131",
+      "cuts/magnus.hpp": "710e4277d632b4d0deabbef9644a778f985289477bab8aa51650959a0ab79430",
+      "cuts/distribution.hpp": "8ac7b7b2c25be1737e55bcbc2b5f1e15f864c49e6951d17736c869a32f23310d",
+      "cuts/rotation_cache.hpp": "f9f1889cf8bceb3e96e6fa1700d1672fa7642821114009867d13fcb476747367",
+      "cuts/polarization.hpp": "f088c07346b6ca018dad24d8d56a3eba03c69a10e973c2b800c9fee89c6e8812",
+      "cuts/dopr5.hpp": "b219c4cda370dcd95a3ebcef5b69db70e3beb30cd74f4cf5958aaa46cc285451",
+      "cuts/initialize.hpp": "95a1c8f40a8e71e5691023fd19e0734277ef7aa54901a76512b133aef6ffff78",
+      "cuts/hunt.hpp": "675c77c6364dc9625dd00a149154c786d2aa3cf0a21b4e9547db2565c566b19c"
+    },
+    "input_hashes": {
+      "src/find_root.hpp": "28c9c951a5b59dc355f1182c4b772c0bf9807ab586bd2330cbe524a02dec9da2",
+      "src/evolution.hpp": "36296109c7dec54715e13b514d069ed8a17532cacae5feeb3d22ab84ebca9189",
+      "src/bfield.hpp": "6513c80698ee79fcccbe3e13bdb4fd99d2d2e77a21e214fa6f60b06c0350ddaf",
+      "src/doubles.hpp": "6c23d8bd4cb5a8427dc319740f68e925ba6bab9544fdc20b648537520da4db6b",
+      "src/bessel_K1_scaled.hpp": "17988f3be1a5c7089eaf630278512466c2a6350579b09a53a5f7b2a4177473e0",
+      "src/component.hpp": "3a114ef970d8782422b2ac51fc048999623f345747817b87387d9e830658940c",
+      "src/resonant.hpp": "5ec13151f9dc496615dd04a0d3b2902f9f6cd195ae09128888740dd0d438200c",
+      "src/geodesic.hpp": "a469adf4ce23f4999075ee06b4d26aaa07126cc288188ef12f59eb42fe50d429",
+      "src/constants.hpp": "73b657af37449485a732df7d74b8f932e17974ac613ac703f4bd1ccd4fb9a035",
+      "src/quad.hpp": "b38a4d69d925a4541bb7d6f8677fb4fe2dfeb9329a9ca2c75fc4bc673f8b9cf7",
+      "src/ran.hpp": "f48e7a15dc4f93057996630a9f9d500e3c3a24a3a3817c5710173bc87b450131",
+      "src/magnus.hpp": "710e4277d632b4d0deabbef9644a778f985289477bab8aa51650959a0ab79430",
+      "src/distribution.hpp": "8ac7b7b2c25be1737e55bcbc2b5f1e15f864c49e6951d17736c869a32f23310d",
+      "src/rotation_cache.hpp": "f9f1889cf8bceb3e96e6fa1700d1672fa7642821114009867d13fcb476747367",
+      "src/main.cpp": "951c51ef906f961978f809095b6e7432843442db29fbb20f05b4e04b9503e8c2",
+      "src/polarization.hpp": "f088c07346b6ca018dad24d8d56a3eba03c69a10e973c2b800c9fee89c6e8812",
+      "src/dopr5.hpp": "b219c4cda370dcd95a3ebcef5b69db70e3beb30cd74f4cf5958aaa46cc285451",
+      "src/initialize.hpp": "95a1c8f40a8e71e5691023fd19e0734277ef7aa54901a76512b133aef6ffff78",
+      "src/hunt.hpp": "675c77c6364dc9625dd00a149154c786d2aa3cf0a21b4e9547db2565c566b19c",
+      "table/bfield_t10.txt": "fc947c28074590bcbea69314e1edbaaaf855c8f84f24c421d3acb05e7f2cda94"
+    }
+  },
+  "results": [
+    {
+      "n": 1000,
+      "seed": 42,
+      "runs": {
+        "baseline": [
+          {
+            "wall": 5.775968875000004,
+            "user": 5.682789,
+            "system": 0.08524600000000015
+          },
+          {
+            "wall": 5.762707500000005,
+            "user": 5.672993000000005,
+            "system": 0.0836319999999997
+          },
+          {
+            "wall": 5.768124291999996,
+            "user": 5.672837000000001,
+            "system": 0.08922299999999961
+          }
+        ],
+        "full": [
+          {
+            "wall": 0.5083734170000014,
+            "user": 0.4945589999999953,
+            "system": 0.011423999999999879
+          },
+          {
+            "wall": 0.504680124999993,
+            "user": 0.49287599999999543,
+            "system": 0.00975199999999976
+          },
+          {
+            "wall": 0.5041577079999939,
+            "user": 0.4913710000000009,
+            "system": 0.01091000000000042
+          }
+        ],
+        "core": [
+          {
+            "wall": 1.7412051249999934,
+            "user": 1.6996450000000038,
+            "system": 0.030008000000000035
+          },
+          {
+            "wall": 1.7129958750000043,
+            "user": 1.6831730000000107,
+            "system": 0.02668899999999974
+          },
+          {
+            "wall": 1.7258535839999922,
+            "user": 1.6955990000000014,
+            "system": 0.0214970000000001
+          }
+        ],
+        "bounds": [
+          {
+            "wall": 0.8068444999999969,
+            "user": 0.7904730000000058,
+            "system": 0.01346500000000006
+          },
+          {
+            "wall": 0.7985497080000101,
+            "user": 0.7818630000000013,
+            "system": 0.014285000000000103
+          },
+          {
+            "wall": 0.7964011250000027,
+            "user": 0.7800730000000016,
+            "system": 0.01422100000000004
+          }
+        ],
+        "cache": [
+          {
+            "wall": 0.6393741660000103,
+            "user": 0.6252429999999976,
+            "system": 0.011861000000000121
+          },
+          {
+            "wall": 0.6405390409999967,
+            "user": 0.6254310000000061,
+            "system": 0.01223099999999988
+          },
+          {
+            "wall": 0.6459256670000002,
+            "user": 0.6290639999999996,
+            "system": 0.014336000000000126
+          }
+        ],
+        "dense": [
+          {
+            "wall": 0.5500890830000031,
+            "user": 0.5381109999999865,
+            "system": 0.008257999999999655
+          },
+          {
+            "wall": 0.5432156670000126,
+            "user": 0.5295979999999929,
+            "system": 0.011309000000000236
+          },
+          {
+            "wall": 0.5447475839999925,
+            "user": 0.5321420000000074,
+            "system": 0.010645999999999933
+          }
+        ],
+        "initial_step": [
+          {
+            "wall": 0.5864385419999962,
+            "user": 0.5692020000000042,
+            "system": 0.014188000000000311
+          },
+          {
+            "wall": 0.5754738330000038,
+            "user": 0.561081999999999,
+            "system": 0.012077999999999811
+          },
+          {
+            "wall": 0.5763405830000039,
+            "user": 0.5632459999999924,
+            "system": 0.011028999999999733
+          }
+        ],
+        "norm": [
+          {
+            "wall": 0.5177462080000055,
+            "user": 0.5042900000000046,
+            "system": 0.01106100000000021
+          },
+          {
+            "wall": 0.5172913339999923,
+            "user": 0.504610999999997,
+            "system": 0.010521000000000225
+          },
+          {
+            "wall": 0.5184709579999947,
+            "user": 0.5061139999999966,
+            "system": 0.01021099999999997
+          }
+        ],
+        "quadrature": [
+          {
+            "wall": 0.5472637919999954,
+            "user": 0.5350499999999982,
+            "system": 0.010285999999999795
+          },
+          {
+            "wall": 0.5476144170000055,
+            "user": 0.5350509999999957,
+            "system": 0.01059499999999991
+          },
+          {
+            "wall": 0.5486660830000005,
+            "user": 0.5356429999999932,
+            "system": 0.010766999999999971
+          }
+        ],
+        "cuts": [
+          {
+            "wall": 0.6005014590000002,
+            "user": 0.5861480000000014,
+            "system": 0.012207999999999775
+          },
+          {
+            "wall": 0.6005389580000013,
+            "user": 0.5865030000000075,
+            "system": 0.01206800000000019
+          },
+          {
+            "wall": 0.6006787500000002,
+            "user": 0.5881750000000068,
+            "system": 0.010243000000000002
+          }
+        ],
+        "locator": [
+          {
+            "wall": 0.5225777499999964,
+            "user": 0.5079879999999974,
+            "system": 0.01176200000000005
+          },
+          {
+            "wall": 0.5128731669999951,
+            "user": 0.5006269999999944,
+            "system": 0.009937000000000307
+          },
+          {
+            "wall": 0.5125947500000052,
+            "user": 0.5011750000000035,
+            "system": 0.009328000000000003
+          }
+        ]
+      },
+      "medians": {
+        "baseline": {
+          "wall": 5.768124291999996,
+          "user": 5.672993000000005,
+          "system": 0.08524600000000015
+        },
+        "full": {
+          "wall": 0.504680124999993,
+          "user": 0.49287599999999543,
+          "system": 0.01091000000000042
+        },
+        "core": {
+          "wall": 1.7258535839999922,
+          "user": 1.6955990000000014,
+          "system": 0.02668899999999974
+        },
+        "bounds": {
+          "wall": 0.7985497080000101,
+          "user": 0.7818630000000013,
+          "system": 0.01422100000000004
+        },
+        "cache": {
+          "wall": 0.6405390409999967,
+          "user": 0.6254310000000061,
+          "system": 0.01223099999999988
+        },
+        "dense": {
+          "wall": 0.5447475839999925,
+          "user": 0.5321420000000074,
+          "system": 0.010645999999999933
+        },
+        "initial_step": {
+          "wall": 0.5763405830000039,
+          "user": 0.5632459999999924,
+          "system": 0.012077999999999811
+        },
+        "norm": {
+          "wall": 0.5177462080000055,
+          "user": 0.504610999999997,
+          "system": 0.010521000000000225
+        },
+        "quadrature": {
+          "wall": 0.5476144170000055,
+          "user": 0.5350509999999957,
+          "system": 0.01059499999999991
+        },
+        "cuts": {
+          "wall": 0.6005389580000013,
+          "user": 0.5865030000000075,
+          "system": 0.01206800000000019
+        },
+        "locator": {
+          "wall": 0.5128731669999951,
+          "user": 0.5011750000000035,
+          "system": 0.009937000000000307
+        }
+      },
+      "relative_to_full": {
+        "baseline": 11.509980197859214,
+        "full": 1.0,
+        "core": 3.4402141715157915,
+        "bounds": 1.5863280013634435,
+        "cache": 1.2689418839627247,
+        "dense": 1.0796670967951623,
+        "initial_step": 1.1427742474780627,
+        "norm": 1.0238092339655445,
+        "quadrature": 1.085569189816507,
+        "cuts": 1.1899605580308494,
+        "locator": 1.0168379064917101
+      }
+    },
+    {
+      "n": 3000,
+      "seed": 1000000,
+      "runs": {
+        "baseline": [
+          {
+            "wall": 15.239056208999997,
+            "user": 14.985662000000005,
+            "system": 0.2409939999999997
+          },
+          {
+            "wall": 15.344155999999998,
+            "user": 15.058943,
+            "system": 0.23299299999999956
+          },
+          {
+            "wall": 15.667287915999992,
+            "user": 15.290675000000022,
+            "system": 0.24053400000000025
+          }
+        ],
+        "full": [
+          {
+            "wall": 1.3798530840000183,
+            "user": 1.354179000000002,
+            "system": 0.021794000000000313
+          },
+          {
+            "wall": 1.3975055840000152,
+            "user": 1.3631090000000086,
+            "system": 0.02830699999999986
+          },
+          {
+            "wall": 1.3838079170000128,
+            "user": 1.3561469999999929,
+            "system": 0.02316799999999919
+          }
+        ],
+        "core": [
+          {
+            "wall": 4.812641834000004,
+            "user": 4.729541000000012,
+            "system": 0.07732300000000025
+          },
+          {
+            "wall": 4.8302320829999985,
+            "user": 4.743427999999994,
+            "system": 0.07832099999999986
+          },
+          {
+            "wall": 4.950958334000006,
+            "user": 4.829284999999999,
+            "system": 0.05962400000000034
+          }
+        ],
+        "bounds": [
+          {
+            "wall": 2.2650487079999806,
+            "user": 2.218697999999989,
+            "system": 0.036144000000000176
+          },
+          {
+            "wall": 2.306559084000014,
+            "user": 2.2526569999999992,
+            "system": 0.04000300000000001
+          },
+          {
+            "wall": 2.2767120419999856,
+            "user": 2.2307010000000105,
+            "system": 0.039373000000000324
+          }
+        ],
+        "cache": [
+          {
+            "wall": 1.6318099159999946,
+            "user": 1.6028639999999967,
+            "system": 0.02530600000000005
+          },
+          {
+            "wall": 1.644654250000002,
+            "user": 1.609893999999997,
+            "system": 0.028226999999999336
+          },
+          {
+            "wall": 1.6376773749999813,
+            "user": 1.6146679999999947,
+            "system": 0.01687200000000022
+          }
+        ],
+        "dense": [
+          {
+            "wall": 1.4796968749999735,
+            "user": 1.4476939999999985,
+            "system": 0.029042999999999708
+          },
+          {
+            "wall": 1.5276092499999834,
+            "user": 1.481630999999993,
+            "system": 0.035671000000000674
+          },
+          {
+            "wall": 1.4971962500000018,
+            "user": 1.4755030000000033,
+            "system": 0.01686500000000013
+          }
+        ],
+        "initial_step": [
+          {
+            "wall": 1.5934215000000052,
+            "user": 1.5646569999999969,
+            "system": 0.024777999999999967
+          },
+          {
+            "wall": 1.6305947500000002,
+            "user": 1.5804200000000037,
+            "system": 0.03091899999999992
+          },
+          {
+            "wall": 1.6290283340000258,
+            "user": 1.58971200000002,
+            "system": 0.019580000000000375
+          }
+        ],
+        "norm": [
+          {
+            "wall": 1.4074632079999958,
+            "user": 1.3757910000000066,
+            "system": 0.027489999999999792
+          },
+          {
+            "wall": 1.4059885419999887,
+            "user": 1.3779749999999922,
+            "system": 0.024086000000000496
+          },
+          {
+            "wall": 1.4423806249999984,
+            "user": 1.402782000000002,
+            "system": 0.026690999999999576
+          }
+        ],
+        "quadrature": [
+          {
+            "wall": 1.5034327500000018,
+            "user": 1.476984999999999,
+            "system": 0.023205000000000364
+          },
+          {
+            "wall": 1.5161596250000002,
+            "user": 1.486235999999991,
+            "system": 0.0235000000000003
+          },
+          {
+            "wall": 1.5363665410000067,
+            "user": 1.4984939999999938,
+            "system": 0.026869999999999727
+          }
+        ],
+        "cuts": [
+          {
+            "wall": 1.6845512910000053,
+            "user": 1.653176000000002,
+            "system": 0.02667200000000003
+          },
+          {
+            "wall": 1.7128386250000176,
+            "user": 1.6713530000000105,
+            "system": 0.02844599999999975
+          },
+          {
+            "wall": 1.6625866669999994,
+            "user": 1.6491939999999943,
+            "system": 0.007843999999999518
+          }
+        ],
+        "locator": [
+          {
+            "wall": 1.4093123329999742,
+            "user": 1.3793050000000022,
+            "system": 0.025786999999999782
+          },
+          {
+            "wall": 1.387810958000017,
+            "user": 1.360444000000001,
+            "system": 0.024065000000000225
+          },
+          {
+            "wall": 1.4084198749999928,
+            "user": 1.3778669999999806,
+            "system": 0.025331000000000437
+          }
+        ]
+      },
+      "medians": {
+        "baseline": {
+          "wall": 15.344155999999998,
+          "user": 15.058943,
+          "system": 0.24053400000000025
+        },
+        "full": {
+          "wall": 1.3838079170000128,
+          "user": 1.3561469999999929,
+          "system": 0.02316799999999919
+        },
+        "core": {
+          "wall": 4.8302320829999985,
+          "user": 4.743427999999994,
+          "system": 0.07732300000000025
+        },
+        "bounds": {
+          "wall": 2.2767120419999856,
+          "user": 2.2307010000000105,
+          "system": 0.039373000000000324
+        },
+        "cache": {
+          "wall": 1.6376773749999813,
+          "user": 1.609893999999997,
+          "system": 0.02530600000000005
+        },
+        "dense": {
+          "wall": 1.4971962500000018,
+          "user": 1.4755030000000033,
+          "system": 0.029042999999999708
+        },
+        "initial_step": {
+          "wall": 1.6290283340000258,
+          "user": 1.5804200000000037,
+          "system": 0.024777999999999967
+        },
+        "norm": {
+          "wall": 1.4074632079999958,
+          "user": 1.3779749999999922,
+          "system": 0.026690999999999576
+        },
+        "quadrature": {
+          "wall": 1.5161596250000002,
+          "user": 1.486235999999991,
+          "system": 0.0235000000000003
+        },
+        "cuts": {
+          "wall": 1.6845512910000053,
+          "user": 1.653176000000002,
+          "system": 0.02667200000000003
+        },
+        "locator": {
+          "wall": 1.4084198749999928,
+          "user": 1.3778669999999806,
+          "system": 0.025331000000000437
+        }
+      },
+      "relative_to_full": {
+        "baseline": 11.104211416609024,
+        "full": 1.0,
+        "core": 3.4977240667862843,
+        "bounds": 1.6448814177224313,
+        "cache": 1.1871087721316387,
+        "dense": 1.0880111079403716,
+        "initial_step": 1.165375140010642,
+        "norm": 1.016095600255724,
+        "quadrature": 1.095925441710964,
+        "cuts": 1.2190241913302988,
+        "locator": 1.0160159628712726
+      }
+    }
+  ]
+}

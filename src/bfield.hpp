@@ -3,9 +3,11 @@
 #include "constants.hpp"
 #include "doubles.hpp"
 #include "hunt.hpp"
+#include <algorithm>
 #include <cmath>
 #include <format>
 #include <fstream>
+#include <limits>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -17,6 +19,8 @@ struct BField {
   double mu_min, mu_max;
   int mu_num;
   std::vector<double> f, fp;
+  double angular_upper = std::numeric_limits<double>::infinity();
+  double angular_lower = 0;
 
   BField(std::string fname, double B_pole, double R_star)
       : B_pole(B_pole), R_star(R_star) {
@@ -72,6 +76,30 @@ struct BField {
     }
     if (fin.bad() || !fin.eof())
       fail(line_number + 1, "Error reading table file");
+    // Global bounds for the piecewise-linear table, including the axis.
+    // f(1)=0 makes f/sin(theta) finite in the last cell.
+    if (mu_max == 1 && f.back() == 0 && A >= 0 &&
+        std::all_of(f.begin(), f.end(), [](double x) { return x >= 0; })) {
+      double upper = 0, lower = std::numeric_limits<double>::infinity();
+      for (int i = 0; i + 1 < mu_num; ++i) {
+        double lo = std::lerp(mu_min, mu_max, double(i) / (mu_num - 1));
+        double hi = std::lerp(mu_min, mu_max, double(i + 1) / (mu_num - 1));
+        double fm = std::max(f[i], f[i + 1]);
+        double brmax = std::max(std::abs(fp[i]), std::abs(fp[i + 1]));
+        double brmin = fp[i] * fp[i + 1] <= 0
+                           ? 0
+                           : std::min(std::abs(fp[i]), std::abs(fp[i + 1]));
+        double btmax = hi == 1 ? p * f[i] / std::sqrt((1 - lo) * (1 + lo))
+                               : p * fm / std::sqrt((1 - hi) * (1 + hi));
+        double btmin = p * std::min(f[i], f[i + 1]);
+        double twistmax = A * std::pow(fm, 1 / p);
+        upper = std::max(upper,
+                         std::hypot(brmax, btmax * std::hypot(1.0, twistmax)));
+        lower = std::min(lower, std::hypot(brmin, btmin));
+      }
+      angular_upper = upper * (1 + 1e-12);
+      angular_lower = lower * (1 - 1e-12);
+    }
   }
 
   struct BFieldResult {

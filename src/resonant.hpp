@@ -119,7 +119,7 @@ struct ResonantScattering {
 
   template <class Basis>
   Rates
-  rates(Basis const& b, Polarization const& pol) const {
+  rates(Basis const& b, Polarization const& pol, bool envelope = false) const {
     Rates result{};
     Stokes sb = pol.in_B(b.c, b.s);
     double qb = sb.x, v = sb.z;
@@ -159,7 +159,8 @@ struct ResonantScattering {
         double jacobian = x * x * t * std::sqrt(t) / sqrtD;
         double w = current_factor * comp.current_fraction *
                    comp.dist.inv_abs_b_mean * f * jacobian *
-                   overlap(qb, v, mup, comp.charge_sign);
+                   (envelope ? 0.5 * (1 + mup * mup)
+                             : overlap(qb, v, mup, comp.charge_sign));
         if (!std::isfinite(w) || w < 0)
           throw std::runtime_error("Invalid differential optical depth");
         result[2 * i + j] = {i, j, beta, w};
@@ -196,8 +197,11 @@ struct ResonantScattering {
 
   template <class BasisAt>
   std::vector<double>
-  integration_cuts(double left, double right, BasisAt const& get_basis) const {
+  integration_cuts(double left, double right, BasisAt const& get_basis,
+                   bool endpoints_only = false) const {
     std::vector<double> cuts{left, std::midpoint(left, right), right};
+    if (endpoints_only)
+      cuts = {left, right};
     struct ScanPoint {
       double l, xe, mu;
     };
@@ -227,18 +231,29 @@ struct ResonantScattering {
         if (fb == 0)
           cuts.push_back(b);
         if ((fa < 0 && fb > 0) || (fa > 0 && fb < 0))
-          cuts.push_back(ridders_root(f, a, b, fa, fb));
+          cuts.push_back(ridders_root(
+              f, a, b, fa, fb, endpoints_only ? 1e-10 * (right - left) : 0));
         a = b;
         fa = fb;
       }
     };
 
+    std::vector<double> scanned_ratios;
     for_each_component([&](std::size_t i, auto const& comp) {
       if (comp.current_fraction == 0)
         return;
       double ratio = comp.charge_mass_ratio;
-      scan([&](double xe, double mu) { return discriminant(ratio * xe, mu); });
+      if (!endpoints_only ||
+          std::find(scanned_ratios.begin(), scanned_ratios.end(), ratio) ==
+              scanned_ratios.end()) {
+        scan(
+            [&](double xe, double mu) { return discriminant(ratio * xe, mu); });
+        scanned_ratios.push_back(ratio);
+      }
       for (double beta : knots[i]) {
+        if (endpoints_only && beta != comp.dist.b_min &&
+            beta != comp.dist.b_max)
+          continue;
         double inv_gamma = std::sqrt((1 - beta) * (1 + beta));
         scan([&](double xe, double mu) {
           return ratio * xe * inv_gamma + beta * mu - 1;
@@ -284,6 +299,74 @@ struct ResonantScattering {
       }
       tau += dtau;
     }
+    return std::nullopt;
+  }
+
+  // For physical Stokes vectors W <= (1 + mu_prime^2)/2.
+  template <class B>
+  double
+  envelope_rate(B const& b) const {
+    return total_rate(rates(b, Polarization(), true));
+  }
+
+  template <class BasisAt>
+  std::optional<double>
+  next_candidate(double left, double right, std::vector<double> const& cuts,
+                 BasisAt const& get_basis, double& target, Quad& quad) const {
+    auto fn = [&](double l) { return envelope_rate(get_basis(l)); };
+    for (std::size_t j = 0; j + 1 < cuts.size(); ++j) {
+      double a = std::max(left, cuts[j]), b = std::min(right, cuts[j + 1]);
+      if (!(a < b))
+        continue;
+      auto integral = [&](double end) {
+        return quad.smooth(fn, a, end, options.quad_atol, options.quad_rtol);
+      };
+      double mass = integral(b);
+      if (!(mass >= 0))
+        throw std::runtime_error("Invalid envelope integral");
+      if (mass > 0 && target + mass > 0) {
+        // Retain cumulative mass at both brackets, integrating only the
+        // newly tested part. Safeguarded Newton needs no repeated prefix.
+        double lo = a, hi = b, flo = target, fhi = target + mass;
+        double x = std::lerp(a, b, -target / mass);
+        for (int iteration = 0; iteration < 64; ++iteration) {
+          if (hi - lo <= 1e-5 * (b - a))
+            return std::midpoint(lo, hi);
+          x = std::clamp(x, std::nextafter(lo, hi), std::nextafter(hi, lo));
+          double fx = flo + quad.smooth(fn, lo, x, options.quad_atol,
+                                        options.quad_rtol);
+          if (std::abs(fx) <= 0.1 * options.quad_atol && fn(x) > 0)
+            return x;
+          if (fx < 0) {
+            lo = x;
+            flo = fx;
+          } else {
+            hi = x;
+            fhi = fx;
+          }
+          double rate = fn(x);
+          double trial = rate > 0 ? x - fx / rate : std::midpoint(lo, hi);
+          // Force bracket contraction when Newton sticks to an endpoint.
+          double margin = 0.02 * (hi - lo);
+          x = (trial > lo + margin && trial < hi - margin)
+                  ? trial
+                  : std::lerp(lo, hi, std::clamp(-flo / (fhi - flo), 0.1, 0.9));
+        }
+        throw std::runtime_error("Candidate location did not converge");
+      }
+      target += mass;
+    }
+    return std::nullopt;
+  }
+
+  std::optional<ScatterData>
+  accept_candidate(Basis const& b, Polarization const& pol, Ran& ran) const {
+    auto actual = rates(b, pol);
+    double rate = total_rate(actual), bound = envelope_rate(b);
+    if (!std::isfinite(bound) || rate > bound * (1 + 1e-10))
+      throw std::runtime_error("Scattering majorant violated");
+    if (ran.U() * bound < rate)
+      return ScatterData{b, select_rate(actual, ran).beta};
     return std::nullopt;
   }
 

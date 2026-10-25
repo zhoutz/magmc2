@@ -123,5 +123,8 @@ ridders_root(F const& func, double x1, double x2, double f1, double f2,
       update_bracket(xn, fn);
     }
   }
-  throw std::runtime_error("ridders_root exceeded maximum iterations");
+  // Ridders can stagnate on a nearly flat or numerically noisy function.
+  // The maintained bracket still contains the root; bisection guarantees
+  // contraction without changing successful Ridders searches.
+  return bisect_root(func, xl, xh, fl, fh, xacc);
 }

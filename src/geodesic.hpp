@@ -16,6 +16,7 @@ struct Geodesic {
   using State = std::array<double, 3>;
 
   double rs, R_star;
+  double max_step_fraction = 0.1;
   StepperDopr5<3, Geodesic> stepper;
 
   Geodesic(double M_star, double R_star, Options options = {})
@@ -46,7 +47,7 @@ struct Geodesic {
 
   int
   step() {
-    stepper.do_step(0.1 * stepper.y_old[0]);
+    stepper.do_step(max_step_fraction * stepper.y_old[0]);
     return stepper.detect_event();
   }
 

@@ -1,0 +1,26 @@
+{
+  "revision": "5a508f7d76dedc187abc87854438dd87c5411ed3",
+  "compiler": "g++-16 (Homebrew GCC 16.2.0) 16.2.0",
+  "flags": "-std=c++23 -O3 -march=native -Wall -Wextra -Wpedantic -I/opt/homebrew/include -L/opt/homebrew/lib -lstdc++exp -lgsl -lgslcblas",
+  "sha256": {
+    "src/find_root.hpp": "e7f7db78e9c52152445f70351e4c0cd0b66cf95f6d1c449709fbf66387393d26",
+    "src/evolution.hpp": "722d8301f8e9931802b6da16831a2786d197cf7a1e51dc27d3d70e13ecee3bfe",
+    "src/bfield.hpp": "3556b92fea56c7d34527d9d18f796e641c29fa30d3400252d512f726ae38806a",
+    "src/doubles.hpp": "6c23d8bd4cb5a8427dc319740f68e925ba6bab9544fdc20b648537520da4db6b",
+    "src/bessel_K1_scaled.hpp": "17988f3be1a5c7089eaf630278512466c2a6350579b09a53a5f7b2a4177473e0",
+    "src/component.hpp": "3a114ef970d8782422b2ac51fc048999623f345747817b87387d9e830658940c",
+    "src/resonant.hpp": "58261d184e87560860a6776fcc7005ac64bbc21cc90982fffe8ae83041e58e3c",
+    "src/geodesic.hpp": "aec0ccd45a6201f454870b772982362b142717d0bb83b6fc2b575bde176fad52",
+    "src/constants.hpp": "73b657af37449485a732df7d74b8f932e17974ac613ac703f4bd1ccd4fb9a035",
+    "src/quad.hpp": "f703b8b39a4ccd80f602d3a9aaec91152516b1898ff5e1620293c8e6c0001897",
+    "src/ran.hpp": "f48e7a15dc4f93057996630a9f9d500e3c3a24a3a3817c5710173bc87b450131",
+    "src/magnus.hpp": "806a031a8ac06e5d1c13e696e47c6db19095d0994c2241e42c33b2579606b71c",
+    "src/distribution.hpp": "8ac7b7b2c25be1737e55bcbc2b5f1e15f864c49e6951d17736c869a32f23310d",
+    "src/main.cpp": "8842c31789f0a95e4fc408fe58451dae43341f3978d54f3f9714073295a0deeb",
+    "src/polarization.hpp": "f088c07346b6ca018dad24d8d56a3eba03c69a10e973c2b800c9fee89c6e8812",
+    "src/dopr5.hpp": "b219c4cda370dcd95a3ebcef5b69db70e3beb30cd74f4cf5958aaa46cc285451",
+    "src/initialize.hpp": "95a1c8f40a8e71e5691023fd19e0734277ef7aa54901a76512b133aef6ffff78",
+    "src/hunt.hpp": "675c77c6364dc9625dd00a149154c786d2aa3cf0a21b4e9547db2565c566b19c",
+    "table/bfield_t10.txt": "fc947c28074590bcbea69314e1edbaaaf855c8f84f24c421d3acb05e7f2cda94"
+  }
+}
