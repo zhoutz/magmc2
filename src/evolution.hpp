@@ -140,13 +140,6 @@ struct PhotonEvolution {
     double Q, U, V;
   } escaped_data;
 
-  // struct ScatteredData {
-  //   Geodesic::YVector r_psi_alpha;
-  //   double beta;
-  //   std::size_t icomp;
-  //   int iroot;
-  // } scattered_data;
-
   Scat::ScatteredData scattered_data;
 
   EvolveResult
