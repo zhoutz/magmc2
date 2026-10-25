@@ -1,12 +1,12 @@
 #pragma once
 
+#include "constants.hpp"
 #include "doubles.hpp"
 #include "hunt.hpp"
 #include <cmath>
 #include <format>
 #include <fstream>
 #include <iostream>
-#include <utility>
 #include <vector>
 
 struct BField {
@@ -31,8 +31,14 @@ struct BField {
     }
   }
 
-  std::pair<double3, double>
-  B_and_twist(double r, double mu) const {
+  struct BFieldResult {
+    double3 B;
+    // J denotes J_physical/c, with length expressed in km (J/B is per km).
+    double twist, J, Bmag;
+  };
+
+  BFieldResult
+  evaluate(double r, double mu) const {
     double mu_sign = (mu >= 0) ? 1 : -1;
     mu = std::abs(mu);
 
@@ -50,7 +56,10 @@ struct BField {
     double Bph = twist * Bth;
 
     double scale = 0.5 * B_pole * std::pow(R_star / r, 2 + p);
+    double3 B = double3(scale * Br, scale * Bth, scale * Bph);
+    double Bmag = B.length();
+    double J = (p + 1) / (4 * pi * r) * twist * Bmag;
 
-    return std::make_pair(double3(scale * Br, scale * Bth, scale * Bph), twist);
+    return BFieldResult{B, twist, J, Bmag};
   }
 };

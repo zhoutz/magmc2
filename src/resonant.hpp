@@ -1,6 +1,5 @@
 #pragma once
 
-#include "bfield.hpp"
 #include "constants.hpp"
 #include "doubles.hpp"
 #include "find_root.hpp"
@@ -16,12 +15,16 @@
 #include <numeric>
 #include <optional>
 #include <stdexcept>
+#include <tuple>
+#include <utility>
 #include <vector>
 
 // Scattering physics uses local geometry supplied by the transport solver.
 // Random draws and quadrature share the caller's generator and workspace.
-template <typename Comp>
+template <typename... Comps>
 struct ResonantScattering {
+  static constexpr std::size_t n_components = sizeof...(Comps);
+  static_assert(n_components > 0, "At least one scattering component is required");
   struct Options {
     double quad_atol = 1e-8, quad_rtol = 1e-8;
     // n_knots sets the constructor's velocity grid; n_scan is used per
@@ -29,22 +32,39 @@ struct ResonantScattering {
     int n_knots = 8, n_scan = 8;
   };
 
-  BField const& bfield;
-  Comp comp;
-  std::vector<double> knots;
+  // Distributions and their bounds use signed velocities along B.
+  std::tuple<Comps...> components;
+  Options options;
+  std::array<std::vector<double>, n_components> knots;
 
-  ResonantScattering(BField const& bfield, Comp const& comp,
-                     Options const& options = Options{})
-      : bfield(bfield), comp(comp) {
-    for (int i = 0; i < options.n_knots; ++i)
-      knots.push_back(comp.charge_sign *
-                      std::lerp(comp.dist.b_min, comp.dist.b_max,
-                                double(i) / (options.n_knots - 1)));
+  template <class F>
+  void
+  for_each_component(F const& f) const {
+    [&]<std::size_t... I>(std::index_sequence<I...>) {
+      (f(I, std::get<I>(components)), ...);
+    }(std::index_sequence_for<Comps...>{});
+  }
+
+  ResonantScattering(std::tuple<Comps...> components,
+                    Options options = Options{})
+      : components(std::move(components)), options(options) {
+    if (options.n_knots < 2 || options.n_scan < 1)
+      throw std::invalid_argument("Invalid resonance integration grid");
+    for_each_component([&](std::size_t i, auto const& comp) {
+      if (!std::isfinite(comp.current_fraction) || comp.current_fraction < 0 ||
+          !std::isfinite(comp.charge_mass_ratio) || comp.charge_mass_ratio <= 0)
+        throw std::invalid_argument("Invalid current fraction or charge/mass ratio");
+      for (int j = 0; j < options.n_knots; ++j)
+        knots[i].push_back(std::lerp(comp.dist.b_min, comp.dist.b_max,
+                                    double(j) / (options.n_knots - 1)));
+    });
   }
 
   struct Event {
     double l, beta;
     Polarization incoming;
+    std::size_t icomp;
+    int iroot;
   };
 
   template <class Basis>
@@ -85,10 +105,11 @@ struct ResonantScattering {
   }
 
   struct Rate {
+    std::size_t icomp = 0;
     int iroot = 0; // 0 = lower beta root, 1 = upper beta root
     double beta = 0, weight = 0;
   };
-  using Rates = std::array<Rate, 2>;
+  using Rates = std::array<Rate, 2 * n_components>;
 
   template <class Basis>
   Rates
@@ -98,31 +119,45 @@ struct ResonantScattering {
     Stokes sb = pol.in_B(b.c, b.s);
     double qb = sb.x, v = sb.z;
 
-    if (comp.current_fraction == 0 || b.twist == 0)
+    if (!std::isfinite(b.J) || b.J < 0)
+      throw std::runtime_error("Invalid local current density");
+    for (std::size_t i = 0; i < n_components; ++i)
+      for (int j = 0; j < 2; ++j)
+        result[2 * i + j] = {i, j, 0, 0};
+    if (b.J == 0)
       return result;
-    double x = comp.charge_mass_ratio * x_e(b, omega_inf, rs);
-    double D = discriminant(x, b.mu);
-    // Exact coalescence is an integration boundary, not a sample.
-    if (!(D > 0) || !(x > 0))
-      return result;
-    auto roots = resonance_roots(x, b.mu, D);
-    for (int j = 0; j < 2; ++j) {
-      double beta = roots[j];
-      double f = comp.dist.f(comp.charge_sign * beta);
-      if (!(beta > -1 && beta < 1) || f == 0)
-        continue;
-      double t = (1 - beta) * (1 + beta);
-      double mup = std::clamp((b.mu - beta) / (1 - beta * b.mu), -1.0, 1.0);
-      // Equivalent to (1-beta*mu)^2(1-beta^2)/abs(mu-beta),
-      // but avoids cancellation at coalescing roots.
-      double jacobian = x * x * t * std::sqrt(t) / std::sqrt(D);
-      double w = comp.current_fraction * (bfield.p + 1) * pi * b.twist *
-                 comp.dist.inv_abs_b_mean / b.r * f * jacobian *
-                 overlap(qb, v, mup, comp.charge_sign);
-      if (!std::isfinite(w) || w < 0)
-        throw std::runtime_error("Invalid differential optical depth");
-      result[j] = {j, beta, w};
-    }
+    if (!std::isfinite(b.Bmag) || b.Bmag <= 0)
+      throw std::runtime_error("Positive current requires positive magnetic strength");
+    // J is J_physical/c, expressed with lengths in km, so rates are per km.
+    double current_factor = 4 * pi * pi * b.J / b.Bmag;
+    double xe = x_e(b, omega_inf, rs);
+    for_each_component([&](std::size_t i, auto const& comp) {
+      if (comp.current_fraction == 0)
+        return;
+      double x = comp.charge_mass_ratio * xe;
+      double D = discriminant(x, b.mu);
+      // Exact coalescence is an integration boundary, not a sample.
+      if (!(D > 0) || !(x > 0))
+        return;
+      auto roots = resonance_roots(x, b.mu, D);
+      for (int j = 0; j < 2; ++j) {
+        double beta = roots[j];
+        double f = comp.dist.f(beta);
+        if (!(beta > -1 && beta < 1) || f == 0)
+          continue;
+        double t = (1 - beta) * (1 + beta);
+        double mup = std::clamp((b.mu - beta) / (1 - beta * b.mu), -1.0, 1.0);
+        // Equivalent to (1-beta*mu)^2(1-beta^2)/abs(mu-beta),
+        // but avoids cancellation at coalescing roots.
+        double jacobian = x * x * t * std::sqrt(t) / std::sqrt(D);
+        double w = current_factor * comp.current_fraction *
+                   comp.dist.inv_abs_b_mean * f * jacobian *
+                   overlap(qb, v, mup, comp.charge_sign);
+        if (!std::isfinite(w) || w < 0)
+          throw std::runtime_error("Invalid differential optical depth");
+        result[2 * i + j] = {i, j, beta, w};
+      }
+    });
     return result;
   }
   static
@@ -155,14 +190,14 @@ struct ResonantScattering {
   template <class BasisAt>
   std::vector<double>
   integration_cuts(double left, double right, BasisAt const& get_basis,
-                   double omega_inf, double rs, Options const& options) const {
+                   double omega_inf, double rs) const {
     std::vector<double> cuts{left, std::midpoint(left, right), right};
     struct ScanPoint {
       double l, x, mu;
     };
     auto sample = [&](double l) {
       auto b = get_basis(l);
-      return ScanPoint{l, comp.charge_mass_ratio * x_e(b, omega_inf, rs), b.mu};
+      return ScanPoint{l, x_e(b, omega_inf, rs), b.mu};
     };
     // All boundary functions share this grid. Cache only the geometry they
     // need; root-finding trial points still evaluate the actual trajectory.
@@ -192,11 +227,18 @@ struct ResonantScattering {
       }
     };
 
-    scan([](double x, double mu) { return discriminant(x, mu); });
-    for (double beta : knots) {
-      double inv_gamma = std::sqrt((1 - beta) * (1 + beta));
-      scan([&](double x, double mu) { return x * inv_gamma + beta * mu - 1; });
-    }
+    for_each_component([&](std::size_t i, auto const& comp) {
+      if (comp.current_fraction == 0)
+        return;
+      double ratio = comp.charge_mass_ratio;
+      scan([&](double xe, double mu) { return discriminant(ratio * xe, mu); });
+      for (double beta : knots[i]) {
+        double inv_gamma = std::sqrt((1 - beta) * (1 + beta));
+        scan([&](double xe, double mu) {
+          return ratio * xe * inv_gamma + beta * mu - 1;
+        });
+      }
+    });
 
     std::sort(cuts.begin(), cuts.end());
     cuts.erase(std::unique(cuts.begin(), cuts.end()), cuts.end());
@@ -210,10 +252,8 @@ struct ResonantScattering {
   std::optional<Event>
   integrate_optical_depth(double left, double right, BasisAt const& get_basis,
                           PolarizationAt const& pol_at, double omega_inf,
-                          double rs, double& tau, Ran& ran, Quad& quad,
-                          Options const& options) const {
-    auto cuts =
-        integration_cuts(left, right, get_basis, omega_inf, rs, options);
+                          double rs, double& tau, Ran& ran, Quad& quad) const {
+    auto cuts = integration_cuts(left, right, get_basis, omega_inf, rs);
     auto integrand = [&](double l) {
       return total_rate(rates(get_basis(l), pol_at(l), omega_inf, rs));
     };
@@ -235,7 +275,7 @@ struct ResonantScattering {
         Polarization incoming = pol_at(l);
         Rate event =
             select_rate(rates(get_basis(l), incoming, omega_inf, rs), ran);
-        return Event{l, event.beta, incoming};
+        return Event{l, event.beta, incoming, event.icomp, event.iroot};
       }
       tau += dtau;
     }
@@ -256,10 +296,16 @@ struct ResonantScattering {
     double xe = x_e(b, omega_inf, rs);
     double dx = (xe - x_e(minus, omega_inf, rs)) / (h);
     double dmu = (b.mu - minus.mu) / (h);
-    double x = comp.charge_mass_ratio * xe;
-    double tx = comp.charge_mass_ratio * dx;
-    return discriminant(x, b.mu) < 0 && tx < 0 &&
-           std::abs(b.mu - x * dmu / tx) < 1;
+    bool escaped = true;
+    for_each_component([&](std::size_t, auto const& comp) {
+      if (comp.current_fraction == 0)
+        return;
+      double x = comp.charge_mass_ratio * xe;
+      double tx = comp.charge_mass_ratio * dx;
+      escaped = escaped && discriminant(x, b.mu) < 0 && tx < 0 &&
+                std::abs(b.mu - x * dmu / tx) < 1;
+    });
+    return escaped;
   }
 
   static

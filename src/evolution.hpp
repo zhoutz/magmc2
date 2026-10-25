@@ -19,7 +19,7 @@ struct PhotonEvolution {
 
   BField const& bfield;
   Init const& initializer;
-  Scat const& resonant;
+  Scat const& resonant; // The scattering model must outlive this evolution.
   Ran ran;
   Geodesic geodesic;
   Quad quad;
@@ -39,7 +39,7 @@ struct PhotonEvolution {
 
   struct Basis {
     double3 r_hat, psi_hat, k_hat, s1, s2, B, omega;
-    double Bperp2, r, c, s, kappa, Bmag, mu, twist;
+    double Bperp2, r, c, s, kappa, Bmag, mu, twist, J;
     Basis(double radius, double psi, double alpha, double3 n, double3 e1,
           double3 e2, BField const& field, double energy, double rs) {
       r = radius;
@@ -55,10 +55,12 @@ struct PhotonEvolution {
                   : double3{std::copysign(1.0, muz), 0, 0};
       double3 phi_hat = rho > 0 ? double3{-r_hat.y / rho, r_hat.x / rho, 0}
                                 : double3{0, 1, 0};
-      auto [B_vec, t] = field.B_and_twist(r, muz);
-      twist = t;
+      auto field_result = field.evaluate(r, muz);
+      double3 B_vec = field_result.B;
+      twist = field_result.twist;
+      J = field_result.J;
+      Bmag = field_result.Bmag;
       B = B_vec.x * r_hat + B_vec.y * theta_hat + B_vec.z * phi_hat;
-      Bmag = B.length();
       mu = Bmag > 0 ? std::clamp(dot(k_hat, B) / Bmag, -1.0, 1.0) : 0;
       double L = std::sqrt(1 - rs / r);
       double B1 = dot(B, s1), B2 = dot(B, s2);
@@ -105,10 +107,11 @@ struct PhotonEvolution {
                           PolarizationAt const& pol_at) {
     auto event = resonant.integrate_optical_depth(
         left, right, [&](double l) { return get_basis(l); }, pol_at, omega_inf,
-        geodesic.rs, tau, ran, quad, options.resonant);
+        geodesic.rs, tau, ran, quad);
     if (!event)
       return false;
-    scattered_data = {geodesic.interp(event->l), event->beta};
+    scattered_data = {geodesic.interp(event->l), event->beta,
+                      event->icomp, event->iroot};
     pol = event->incoming;
     return true;
   }
@@ -142,6 +145,8 @@ struct PhotonEvolution {
   struct ScatteredData {
     Geodesic::YVector r_psi_alpha;
     double beta;
+    std::size_t icomp;
+    int iroot;
   } scattered_data;
 
   EvolveResult

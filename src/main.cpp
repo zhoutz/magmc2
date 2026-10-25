@@ -25,8 +25,7 @@ main() {
                                             .current_fraction = 0.5,
                                             .charge_mass_ratio = 1.0};
 
-  ResonantScattering resonant(
-      bfield, std::make_tuple(powerlaw_electron, powerlaw_positron));
+  ResonantScattering resonant(std::make_tuple(powerlaw_electron, powerlaw_positron));
 
   PhotonEvolution photon(M_star, R_star, 42, bfield, initializer, resonant);
 
