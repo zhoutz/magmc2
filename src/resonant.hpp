@@ -24,17 +24,17 @@
 template <typename... Comps>
 struct ResonantScattering {
   static constexpr std::size_t n_components = sizeof...(Comps);
-  static_assert(n_components > 0, "At least one scattering component is required");
+  static_assert(n_components > 0,
+                "At least one scattering component is required");
   struct Options {
     double quad_atol = 1e-8, quad_rtol = 1e-8;
-    // n_knots sets the constructor's velocity grid; n_scan is used per
-    // interval.
+    // n_knots sets the constructor's velocity grid;
+    // n_scan is used per interval.
     int n_knots = 8, n_scan = 8;
-  };
+  } options;
 
   // Distributions and their bounds use signed velocities along B.
   std::tuple<Comps...> components;
-  Options options;
   std::array<std::vector<double>, n_components> knots;
 
   template <class F>
@@ -46,17 +46,18 @@ struct ResonantScattering {
   }
 
   ResonantScattering(std::tuple<Comps...> components,
-                    Options options = Options{})
+                     Options options = Options{})
       : components(std::move(components)), options(options) {
     if (options.n_knots < 2 || options.n_scan < 1)
       throw std::invalid_argument("Invalid resonance integration grid");
     for_each_component([&](std::size_t i, auto const& comp) {
       if (!std::isfinite(comp.current_fraction) || comp.current_fraction < 0 ||
           !std::isfinite(comp.charge_mass_ratio) || comp.charge_mass_ratio <= 0)
-        throw std::invalid_argument("Invalid current fraction or charge/mass ratio");
+        throw std::invalid_argument(
+            "Invalid current fraction or charge/mass ratio");
       for (int j = 0; j < options.n_knots; ++j)
         knots[i].push_back(std::lerp(comp.dist.b_min, comp.dist.b_max,
-                                    double(j) / (options.n_knots - 1)));
+                                     double(j) / (options.n_knots - 1)));
     });
   }
 
@@ -127,7 +128,8 @@ struct ResonantScattering {
     if (b.J == 0)
       return result;
     if (!std::isfinite(b.Bmag) || b.Bmag <= 0)
-      throw std::runtime_error("Positive current requires positive magnetic strength");
+      throw std::runtime_error(
+          "Positive current requires positive magnetic strength");
     // J is J_physical/c, expressed with lengths in km, so rates are per km.
     double current_factor = 4 * pi * pi * b.J / b.Bmag;
     double xe = x_e(b, omega_inf, rs);

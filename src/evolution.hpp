@@ -7,7 +7,6 @@
 #include "polarization.hpp"
 #include "quad.hpp"
 #include "ran.hpp"
-#include "resonant.hpp"
 #include <algorithm>
 #include <cmath>
 
@@ -29,11 +28,8 @@ struct PhotonEvolution {
   Polarization pol;
 
   PhotonEvolution(double M_star, double R_star, int seed, BField const& bfield,
-                  Init const& init, Scat const& scat)
-      : PhotonEvolution(M_star, R_star, seed, bfield, init, scat, Options{}) {}
-
-  PhotonEvolution(double M_star, double R_star, int seed, BField const& bfield,
-                  Init const& init, Scat const& scat, Options options)
+                  Init const& init, Scat const& scat,
+                  Options options = Options{})
       : options(options), bfield(bfield), initializer(init), resonant(scat),
         ran(seed), geodesic(M_star, R_star) {}
 
@@ -110,8 +106,8 @@ struct PhotonEvolution {
         geodesic.rs, tau, ran, quad);
     if (!event)
       return false;
-    scattered_data = {geodesic.interp(event->l), event->beta,
-                      event->icomp, event->iroot};
+    scattered_data = {geodesic.interp(event->l), event->beta, event->icomp,
+                      event->iroot};
     pol = event->incoming;
     return true;
   }
