@@ -97,7 +97,7 @@ struct PhotonEvolution {
     e2 = photon.e2;
     energy_inf = photon.energy_inf;
     tau = std::log(ran.U());
-    pol.set_adiabatic(photon.pol);
+    pol = photon.pol;
   }
 
   template <class PolarizationAt>

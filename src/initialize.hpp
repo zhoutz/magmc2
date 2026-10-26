@@ -13,7 +13,7 @@ struct InitializedPhoton {
   double energy_inf; // photon energy hbar * omega at infinity, in keV
   // Radius in km; orbital and propagation angles in radians.
   double r0, psi0, alpha0;
-  AdiabaticPolarization pol;
+  Polarization pol;
 };
 
 template <typename T>
