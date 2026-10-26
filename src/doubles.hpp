@@ -8,7 +8,7 @@ struct double3 {
 
   double
   length() const {
-    return std::sqrt(x * x + y * y + z * z);
+    return std::hypot(x, y, z);
   }
 };
 

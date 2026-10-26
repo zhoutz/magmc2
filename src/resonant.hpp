@@ -12,7 +12,6 @@
 #include <array>
 #include <cmath>
 #include <cstddef>
-#include <numeric>
 #include <optional>
 #include <stdexcept>
 #include <tuple>
@@ -30,7 +29,8 @@ struct ResonantScattering {
     double quad_atol = 1e-6, quad_rtol = 1e-6;
     // n_knots sets the constructor's velocity grid;
     // n_scan is used per interval.
-    int n_knots = 4, n_scan = 4;
+    // n_od_sample is used to skip intervals with no resonance.
+    int n_knots = 3, n_scan = 3, n_od_sample = 3;
   } options;
 
   // Distributions and their bounds use signed velocities along B.
@@ -47,7 +47,7 @@ struct ResonantScattering {
 
   ResonantScattering(std::tuple<Comps...> components, Options options = {})
       : options(options), components(std::move(components)) {
-    if (options.n_knots < 2 || options.n_scan < 1)
+    if (options.n_knots < 2 || options.n_scan < 2 || options.n_od_sample < 2)
       throw std::invalid_argument("Invalid resonance integration grid");
     for_each_component([&](std::size_t i, auto const& comp) {
       if (!std::isfinite(comp.current_fraction) || comp.current_fraction < 0 ||
@@ -197,7 +197,7 @@ struct ResonantScattering {
   template <class BasisAt>
   std::vector<double>
   integration_cuts(double left, double right, BasisAt const& get_basis) const {
-    std::vector<double> cuts{left, std::midpoint(left, right), right};
+    std::vector<double> cuts{left, right};
     struct ScanPoint {
       double l, xe, mu;
     };
@@ -208,11 +208,10 @@ struct ResonantScattering {
     // All boundary functions share this grid. Cache only the geometry they
     // need; root-finding trial points still evaluate the actual trajectory.
     std::vector<ScanPoint> grid;
-    grid.reserve(options.n_scan + 1);
-    grid.push_back(sample(left));
-    for (int j = 1; j <= options.n_scan; ++j)
+    grid.reserve(options.n_scan);
+    for (int j = 0; j < options.n_scan; ++j)
       grid.push_back(
-          sample(std::lerp(left, right, double(j) / options.n_scan)));
+          sample(std::lerp(left, right, double(j) / (options.n_scan - 1))));
 
     auto scan = [&](auto const& value) {
       auto f = [&](double l) {
@@ -259,6 +258,20 @@ struct ResonantScattering {
   integrate_optical_depth(double left, double right, BasisAt const& get_basis,
                           PolarizationAt const& get_pol, double& tau, Ran& ran,
                           Quad& quad) const {
+    {
+      bool skip = true;
+      for (int i_sample = 0; i_sample < options.n_od_sample; ++i_sample) {
+        double l_sample = std::lerp(
+            left, right, double(i_sample) / (options.n_od_sample - 1));
+        if (total_rate(rates(get_basis(l_sample), get_pol(l_sample))) > 0) {
+          skip = false;
+          break;
+        }
+      }
+      if (skip)
+        return std::nullopt;
+    }
+
     auto cuts = integration_cuts(left, right, get_basis);
     auto integrand = [&](double l) {
       return total_rate(rates(get_basis(l), get_pol(l)));
@@ -271,6 +284,7 @@ struct ResonantScattering {
         return quad.qags(integrand, a, end, options.quad_atol,
                          options.quad_rtol);
       };
+
       double dtau = integral(b);
       if (dtau < 0)
         throw std::runtime_error("Negative integrated optical depth");

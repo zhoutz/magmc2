@@ -164,7 +164,7 @@ struct PhotonEvolution {
       } else {
         StepperMagnus stepper;
         stepper.init(geodesic.l_old(), geodesic.l_new(),
-                     0.1 * (geodesic.l_new() - geodesic.l_old()), pol.stokes);
+                     geodesic.l_new() - geodesic.l_old(), pol.stokes);
         auto stokes_rotation = [&](double l) { return basis(l).omega; };
         while (stepper.do_step(stokes_rotation)) {
           if (integrate_optical_depth(
