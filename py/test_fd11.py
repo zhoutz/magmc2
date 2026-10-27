@@ -110,7 +110,7 @@ class FD11Tests(unittest.TestCase):
     def test_thread_independent_streams(self):
         # More than four blocks, including a partial final block.
         reference, _, raw = self.sample(threads=1, photons=257)
-        for threads in (2, 4):
+        for threads in (2, 4, 20):
             meta, _, other = self.sample(threads=threads, photons=257)
             self.assertEqual(raw, other)
             for key in ("emitted", "escaped", "absorbed", "scatterings"):
@@ -121,6 +121,17 @@ class FD11Tests(unittest.TestCase):
         _, _, low_seed = self.sample(seed=2**32 - 1, photons=8)
         self.assertNotEqual(high_seed, low_seed)
         self.sample(seed=0, photons=1, threads=4)
+
+    def test_bounded_write_window(self):
+        # Exceed the 64 blocks/thread window even with four workers, and
+        # include a partial last block. Exercise draining and reusing slots.
+        options = dict(photons=16641, extra=("--untwisted",))
+        reference, _, raw = self.sample(threads=1, **options)
+        for threads in (2, 4):
+            meta, _, other = self.sample(threads=threads, **options)
+            self.assertEqual(raw, other)
+            for key in ("emitted", "escaped", "absorbed", "scatterings"):
+                self.assertEqual(meta[key], reference[key])
 
     def test_argument_validation(self):
         base = ["--setup", "a", "--threads", "1", "--seed", "42",

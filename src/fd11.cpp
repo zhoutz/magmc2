@@ -11,6 +11,7 @@
 #include <fstream>
 #include <iomanip>
 #include <locale>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <print>
@@ -24,6 +25,8 @@ namespace {
 using Count = std::uint64_t;
 constexpr double radius = 10, temperature = 0.4, polar_field = 1e14;
 constexpr Count block_size = 64;
+// Allow fast workers to keep computing past a slow block, with bounded memory.
+constexpr Count buffered_blocks_per_thread = 64;
 
 struct Arguments {
   char setup = 0;
@@ -352,6 +355,12 @@ run(Arguments const& args) {
   std::condition_variable ready;
   std::exception_ptr failure;
   Count next_id = 0, next_write = 0;
+  struct FinishedBlock {
+    std::string rows;
+    Totals totals;
+  };
+  std::map<Count, FinishedBlock> pending;
+  Count const window = block_size * buffered_blocks_per_thread * args.threads;
   Totals totals;
   std::atomic<Count> completed{0};
   auto start = std::chrono::steady_clock::now(), last_report = start;
@@ -385,7 +394,14 @@ run(Arguments const& args) {
       while (true) {
         Count begin, end;
         {
-          std::lock_guard lock(mutex);
+          std::unique_lock lock(mutex);
+          // Bound ALL assigned but unwritten blocks, including those still
+          // computing. Their reserved slots ensure the earliest block can
+          // always finish and publish, even when the window is full.
+          ready.wait(lock, [&] {
+            return cancelled.load(std::memory_order_relaxed) ||
+                   next_id == args.photons || next_id - next_write < window;
+          });
           if (cancelled.load(std::memory_order_relaxed) ||
               next_id == args.photons)
             return;
@@ -407,16 +423,24 @@ run(Arguments const& args) {
           report();
         }
         std::unique_lock lock(mutex);
-        ready.wait(lock, [&] {
-          return cancelled.load(std::memory_order_relaxed) ||
-                 next_write == begin;
-        });
         if (cancelled.load(std::memory_order_relaxed))
           return;
-        out << rows.view();
-        out.flush();
-        totals.add(block);
-        next_write = end;
+        pending.emplace(begin, FinishedBlock{std::move(rows).str(), block});
+        // Publish out of order, but commit only the contiguous finished prefix.
+        // Workers need not wait for their own block to be written.
+        bool wrote = false;
+        while (true) {
+          auto first = pending.find(next_write);
+          if (first == pending.end())
+            break;
+          out << first->second.rows;
+          totals.add(first->second.totals);
+          next_write += first->second.totals.emitted;
+          pending.erase(first);
+          wrote = true;
+        }
+        if (wrote)
+          out.flush();
         lock.unlock();
         ready.notify_all();
       }
