@@ -148,14 +148,9 @@ struct PhotonEvolution {
     while (true) {
       int geodesic_event = geodesic.step();
       if (pol.is_adiabatic) {
-        auto f_couple = [&](double l) {
-          Basis b = basis(l);
-          return options.eta_couple * b.kappa * b.r - 1;
-        };
-        if (f_couple(geodesic.l_old()) < 0) {
-          Basis b = basis(geodesic.l_old());
+        Basis b = basis(geodesic.l_old());
+        if (options.eta_couple * b.kappa * b.r < 1)
           pol.set_stokes(b.c, b.s);
-        }
       }
       if (pol.is_adiabatic) {
         if (integrate_optical_depth(geodesic.l_old(), geodesic.l_new(),
