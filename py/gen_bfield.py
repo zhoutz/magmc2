@@ -1,3 +1,4 @@
+import sys
 import numpy as np
 from scipy.integrate import solve_bvp
 
@@ -161,7 +162,10 @@ def solve_twisted_dipole(
 
 
 if __name__ == "__main__":
-    target_delta_phi = 1.0  # radians
+    if len(sys.argv) > 1:
+        target_delta_phi = float(sys.argv[1])
+    else:
+        target_delta_phi = 1.0  # radians
     mu_min = 0.0
     mu_max = 1.0
     mu_num = 10001
