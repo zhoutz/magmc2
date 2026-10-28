@@ -28,7 +28,7 @@ main() {
   ResonantScattering resonant(
       std::make_tuple(powerlaw_electron, powerlaw_positron));
 
-  int N = 1000;
+  int N = 10000;
   for (int i = 0; i < N; ++i) {
     PhotonEvolution photon(M_star, R_star, 42 + i, bfield, initializer,
                            resonant);
