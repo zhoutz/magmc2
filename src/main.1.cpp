@@ -59,6 +59,6 @@ main() {
         }
       }
     }
-    output.write_photon_group("group_" + std::to_string(i), group);
+    output.write_photon_group("seed_" + std::to_string(seed), group);
   }
 }

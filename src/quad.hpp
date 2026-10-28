@@ -8,8 +8,15 @@
 
 struct Quad {
   static constexpr size_t limit = 8192;
-  gsl_integration_workspace* workspace = gsl_integration_workspace_alloc(limit);
-  Quad() { gsl_set_error_handler_off(); }
+  gsl_integration_workspace* workspace;
+  Quad() {
+    [[maybe_unused]] static auto const previous_handler =
+        gsl_set_error_handler_off();
+
+    workspace = gsl_integration_workspace_alloc(limit);
+    if (!workspace)
+      throw std::runtime_error("Failed to allocate GSL integration workspace");
+  }
   ~Quad() { gsl_integration_workspace_free(workspace); }
 
   template <class F>
