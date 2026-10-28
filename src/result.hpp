@@ -56,13 +56,12 @@ struct OutputHDF5 {
       : file(filename, HighFive::File::OpenOrCreate) {}
 
   void
-  write_photon_group(std::string const& group_name,
+  write_photon_group(std::string const& dset_name,
                      ResultPhotonGroup const& group) {
-    auto group_h5 = file.createGroup(group_name);
-    group_h5.createAttribute("n_absorbed", group.n_absorbed);
-    group_h5.createAttribute("n_escaped", group.n_escaped);
-    group_h5.createAttribute("seed", group.seed);
     // A one-dimensional compound dataset: one ResultPhoton per element.
-    group_h5.createDataSet("photons", group.photons);
+    auto dset = file.createDataSet(dset_name, group.photons);
+    dset.createAttribute("n_absorbed", group.n_absorbed);
+    dset.createAttribute("n_escaped", group.n_escaped);
+    dset.createAttribute("seed", group.seed);
   }
 };
