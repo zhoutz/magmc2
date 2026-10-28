@@ -14,17 +14,22 @@ struct ResultPhoton {
 
 struct ResultPhotonGroup {
   std::vector<ResultPhoton> photons;
-  int n_absorbed, n_escaped;
+  int n_absorbed, n_escaped, n_failed;
   int seed;
-  ResultPhotonGroup(int seed) : n_absorbed(0), n_escaped(0), seed(seed) {}
+  ResultPhotonGroup(int seed)
+      : n_absorbed(0), n_escaped(0), n_failed(0), seed(seed) {}
+  void
+  add_failed() {
+    ++n_failed;
+  }
   void
   add_absorbed() {
     ++n_absorbed;
   }
   void
   add_escaped(ResultPhoton const& photon) {
-    ++n_escaped;
     photons.push_back(photon);
+    ++n_escaped;
   }
 };
 
@@ -62,6 +67,7 @@ struct OutputHDF5 {
     auto dset = file.createDataSet(dset_name, group.photons);
     dset.createAttribute("n_absorbed", group.n_absorbed);
     dset.createAttribute("n_escaped", group.n_escaped);
+    dset.createAttribute("n_failed", group.n_failed);
     dset.createAttribute("seed", group.seed);
   }
 };
