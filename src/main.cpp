@@ -35,10 +35,10 @@ main() {
     photon.init();
     while (true) {
       auto result = photon.evolve();
-      if (result == decltype(photon)::EvolveResult::Scattered) {
+      if (result == EvolveResult::Scattered) {
         // std::println("Scattered: beta={}", photon.scatter_data.beta);
         photon.perform_scattering();
-      } else if (result == decltype(photon)::EvolveResult::Escaped) {
+      } else if (result == EvolveResult::Escaped) {
         auto const& e = photon.escape_data;
         std::println("Escaped: energy_inf={} muk={} Q={} U={} V={}",
                      e.energy_inf, e.muk, e.Q, e.U, e.V);

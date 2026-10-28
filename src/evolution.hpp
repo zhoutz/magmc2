@@ -51,6 +51,8 @@ struct Basis {
   }
 };
 
+enum class EvolveResult { Absorbed, Escaped, Scattered };
+
 template <PhotonInitializer Init, typename Scat>
 struct PhotonEvolution {
   struct Options {
@@ -100,21 +102,6 @@ struct PhotonEvolution {
     pol = photon.pol;
   }
 
-  // template <class PolarizationAt>
-  // bool
-  // integrate_optical_depth(double left, double right,
-  //                         PolarizationAt const& pol_at) {
-  //   auto event = resonant.integrate_optical_depth(
-  //       left, right, [&](double l) { return basis(l); }, pol_at, tau, ran,
-  //       quad);
-  //   if (!event) {
-  //     return false;
-  //   } else {
-  //     scatter_data = *event;
-  //     return true;
-  //   }
-  // }
-
   void
   record_escape(Geodesic::State y) {
     auto [r, psi, alpha] = y;
@@ -133,8 +120,6 @@ struct PhotonEvolution {
                    .U = sky.y,
                    .V = sky.z};
   }
-
-  enum class EvolveResult { Absorbed, Escaped, Scattered };
 
   struct EscapeData {
     double energy_inf, muk;
