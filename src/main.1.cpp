@@ -6,11 +6,12 @@
 #include <algorithm>
 #include <atomic>
 #include <exception>
+#include <format>
 #include <fstream>
 #include <iostream>
 #include <mutex>
 #include <optional>
-#include <stdexcept>
+#include <print>
 #include <string>
 #include <thread>
 #include <tuple>
@@ -40,12 +41,10 @@ main() try {
       std::make_tuple(powerlaw_electron, powerlaw_positron));
 
   int start_seed = 42;
-  int N_group = 10;
-  int group_size = 100;
+  int N_group = 100;
+  int group_size = 1000;
   int n_threads = 4;
   std::string error_log_file = "data/error.log";
-  if (n_threads <= 0)
-    throw std::invalid_argument("n_threads must be positive");
 
   OutputHDF5 output("data/output.h5");
   std::ofstream error_log;
@@ -56,8 +55,12 @@ main() try {
   for (int i = 0; i < N_group; ++i) {
     int seed = start_seed + i;
     // Existing datasets are assumed complete, including failed photons.
-    if (!output.file.exist("seed_" + std::to_string(seed)))
+    if (!output.file.exist(std::format("seed_{}", seed)))
       pending_seeds.push_back(seed);
+  }
+  if (pending_seeds.empty()) {
+    std::println("All photon groups already exist in output file");
+    return 0;
   }
 
   std::mutex output_mutex, log_mutex, exception_mutex;
@@ -113,8 +116,9 @@ main() try {
         group.add_absorbed();
     }
     std::lock_guard lock(output_mutex);
-    output.write_photon_group("seed_" + std::to_string(seed), group);
+    output.write_photon_group(std::format("seed_{}", seed), group);
     output.file.flush();
+    std::println("Finished processing seed {}", seed);
   };
 
   std::vector<std::jthread> workers;
