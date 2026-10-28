@@ -30,7 +30,7 @@ struct ResonantScattering {
     // n_knots sets the constructor's velocity grid;
     // n_scan is used per interval.
     // n_od_sample is used to skip intervals with no resonance.
-    int n_knots = 3, n_scan = 3, n_od_sample = 3;
+    int n_knots = 4, n_scan = 4, n_od_sample = 4;
   } options;
 
   // Distributions and their bounds use signed velocities along B.
@@ -82,6 +82,7 @@ struct ResonantScattering {
   struct ResonantRoot {
     double beta, sqrtD, mup;
   };
+
   static
   std::array<ResonantRoot, 2>
   resonance_roots(double x, double mu, double D) {
@@ -94,7 +95,7 @@ struct ResonantScattering {
     }};
     if (roots[1].beta < roots[0].beta) {
       // mup for the lower root is positive, for the upper root is negative.
-      // so we do not swap the mup values when swapping the roots.
+      // so do not swap the mup values when swapping the roots.
       std::swap(roots[0].beta, roots[1].beta);
     }
     return roots;
@@ -117,12 +118,23 @@ struct ResonantScattering {
   };
   using Rates = std::array<Rate, 2 * n_components>;
 
-  template <class Basis>
   Rates
   rates(Basis const& b, Polarization const& pol) const {
-    Rates result{};
     Stokes sb = pol.in_B(b.c, b.s);
-    double qb = sb.x, v = sb.z;
+    return rates_impl(b, [qb = sb.x, v = sb.z](double mup, int charge_sign) {
+      return overlap(qb, v, mup, charge_sign);
+    });
+  }
+
+  Rates
+  rates_enveloped(Basis const& b) const {
+    return rates_impl(b, [](double mup, int) { return (1 + mup * mup) / 2; });
+  }
+
+  template <class OverlapFunc>
+  Rates
+  rates_impl(Basis const& b, OverlapFunc const& get_overlap) const {
+    Rates result{};
 
     if (!std::isfinite(b.J) || b.J < 0)
       throw std::runtime_error("Invalid local current density");
@@ -159,7 +171,7 @@ struct ResonantScattering {
         double jacobian = x * x * t * std::sqrt(t) / sqrtD;
         double w = current_factor * comp.current_fraction *
                    comp.dist.inv_abs_b_mean * f * jacobian *
-                   overlap(qb, v, mup, comp.charge_sign);
+                   get_overlap(mup, comp.charge_sign);
         if (!std::isfinite(w) || w < 0)
           throw std::runtime_error("Invalid differential optical depth");
         result[2 * i + j] = {i, j, beta, w};
@@ -175,6 +187,7 @@ struct ResonantScattering {
       sum += r.weight;
     return sum;
   }
+
   static
   Rate
   select_rate(Rates const& rates, Ran& ran) {
@@ -250,54 +263,51 @@ struct ResonantScattering {
     return cuts;
   }
 
-  // tau is the remaining (negative) optical-depth threshold. At an event it
-  // retains its value at the beginning of the containing integration segment.
-  // The caller applies the returned event and resets tau after scattering.
-  template <class BasisAt, class PolarizationAt>
-  std::optional<ScatterData>
-  integrate_optical_depth(double left, double right, BasisAt const& get_basis,
-                          PolarizationAt const& get_pol, double& tau, Ran& ran,
-                          Quad& quad) const {
-    {
-      bool skip = true;
-      for (int i_sample = 0; i_sample < options.n_od_sample; ++i_sample) {
-        double l_sample = std::lerp(
-            left, right, double(i_sample) / (options.n_od_sample - 1));
-        if (total_rate(rates(get_basis(l_sample), get_pol(l_sample))) > 0) {
-          skip = false;
-          break;
-        }
-      }
-      if (skip)
-        return std::nullopt;
-    }
-
-    auto cuts = integration_cuts(left, right, get_basis);
-    auto integrand = [&](double l) {
-      return total_rate(rates(get_basis(l), get_pol(l)));
+  template <class BasisAt>
+  std::optional<double>
+  next_candidate(double left, double right, BasisAt const& get_basis,
+                 double& tau, Quad& quad) const {
+    auto envelope = [&](double l) {
+      return total_rate(rates_enveloped(get_basis(l)));
     };
+    auto cuts = integration_cuts(left, right, get_basis);
     for (size_t j = 0; j + 1 < cuts.size(); ++j) {
       double a = cuts[j], b = cuts[j + 1];
-      if (!(a < b))
-        continue;
+      {
+        bool skip = true;
+        for (int i_sample = 0; i_sample < options.n_od_sample; ++i_sample) {
+          double l_sample =
+              std::lerp(a, b, double(i_sample) / (options.n_od_sample - 1));
+          if (envelope(l_sample) > 0) {
+            skip = false;
+            break;
+          }
+        }
+        if (skip)
+          continue;
+      }
       auto integral = [&](double end) {
-        return quad.qags(integrand, a, end, options.quad_atol,
+        return quad.qags(envelope, a, end, options.quad_atol,
                          options.quad_rtol);
       };
-
       double dtau = integral(b);
-      if (dtau < 0)
-        throw std::runtime_error("Negative integrated optical depth");
-      if (dtau > 0 && tau + dtau > 0) {
-        // Find the point where the optical depth reaches zero.
+      if (tau + dtau > 0) {
         auto residual = [&](double l) { return tau + integral(l); };
         double l =
             ridders_root(residual, a, b, tau, tau + dtau, 1e-5 * (b - a));
-        Rate event = select_rate(rates(get_basis(l), get_pol(l)), ran);
-        return ScatterData{get_basis(l), event.beta};
+        return l;
       }
       tau += dtau;
     }
+    return std::nullopt;
+  }
+
+  std::optional<ScatterData>
+  accept_candidate(Basis const& b, Polarization const& pol, Ran& ran) const {
+    auto actual = rates(b, pol);
+    double rate = total_rate(actual), bound = total_rate(rates_enveloped(b));
+    if (ran.U() * bound < rate)
+      return ScatterData{b, select_rate(actual, ran).beta};
     return std::nullopt;
   }
 

@@ -100,20 +100,20 @@ struct PhotonEvolution {
     pol = photon.pol;
   }
 
-  template <class PolarizationAt>
-  bool
-  integrate_optical_depth(double left, double right,
-                          PolarizationAt const& pol_at) {
-    auto event = resonant.integrate_optical_depth(
-        left, right, [&](double l) { return basis(l); }, pol_at, tau, ran,
-        quad);
-    if (!event) {
-      return false;
-    } else {
-      scatter_data = *event;
-      return true;
-    }
-  }
+  // template <class PolarizationAt>
+  // bool
+  // integrate_optical_depth(double left, double right,
+  //                         PolarizationAt const& pol_at) {
+  //   auto event = resonant.integrate_optical_depth(
+  //       left, right, [&](double l) { return basis(l); }, pol_at, tau, ran,
+  //       quad);
+  //   if (!event) {
+  //     return false;
+  //   } else {
+  //     scatter_data = *event;
+  //     return true;
+  //   }
+  // }
 
   void
   record_escape(Geodesic::State y) {
@@ -152,37 +152,49 @@ struct PhotonEvolution {
         if (options.eta_couple * b.kappa * b.r < 1)
           pol.set_stokes(b.c, b.s);
       }
-      if (pol.is_adiabatic) {
-        if (integrate_optical_depth(geodesic.l_old(), geodesic.l_new(),
-                                    [&](double) { return pol; }))
-          return EvolveResult::Scattered;
-      } else {
-        StepperMagnus stepper;
-        stepper.init(geodesic.l_old(), geodesic.l_new(),
-                     geodesic.l_new() - geodesic.l_old(), pol.stokes);
-        auto stokes_rotation = [&](double l) { return basis(l).omega; };
-        while (stepper.do_step(stokes_rotation)) {
-          if (integrate_optical_depth(
-                  stepper.x_old, stepper.x_new,
-                  [&](double l) { return Polarization(stepper.interp(l)); }))
-            return EvolveResult::Scattered;
 
-          pol.set_stokes(stepper.y_new);
-          Geodesic::State y = geodesic.interp(stepper.x_new);
-          bool outward_and_far_enough =
-              std::cos(y[2]) > 0 && y[0] > 1e3 * geodesic.R_star;
-          double stokes_change = (stepper.y_new - stepper.y_old).length() *
-                                 y[0] / (stepper.x_new - stepper.x_old);
-          bool is_resonant_escaped = resonant.resonance_escape(
-              1e-3 * stepper.h_old, basis(stepper.x_old), basis(stepper.x_new));
-          if (outward_and_far_enough && stokes_change < options.delta_stokes &&
-              is_resonant_escaped && stepper.phase_advance < pi / 2) {
-            record_escape(y);
-            return EvolveResult::Escaped;
+      double cursor = geodesic.l_old();
+      while (cursor < geodesic.l_new()) {
+        auto candidate = resonant.next_candidate(
+            cursor, geodesic.l_new(), [&](double l) { return basis(l); }, tau,
+            quad);
+        double end = candidate.value_or(geodesic.l_new());
+
+        if (!pol.is_adiabatic) {
+          StepperMagnusWithoutDense stepper;
+          stepper.init(cursor, end, end - cursor, pol.stokes);
+          auto stokes_rotation = [&](double l) { return basis(l).omega; };
+          while (stepper.do_step(stokes_rotation)) {
+            pol.set_stokes(stepper.y_new);
+            Geodesic::State y = geodesic.interp(stepper.x_new);
+            bool outward_and_far_enough =
+                std::cos(y[2]) > 0 && y[0] > 1e3 * geodesic.R_star;
+            double stokes_change = (stepper.y_new - stepper.y_old).length() *
+                                   y[0] / (stepper.x_new - stepper.x_old);
+            bool is_resonant_escaped = resonant.resonance_escape(
+                1e-3 * stepper.h_old, basis(stepper.x_old),
+                basis(stepper.x_new));
+            if (outward_and_far_enough &&
+                stokes_change < options.delta_stokes && is_resonant_escaped) {
+              record_escape(y);
+              return EvolveResult::Escaped;
+            }
+            stepper.update_old();
           }
-          stepper.update_old();
         }
+
+        if (!candidate)
+          break;
+
+        auto scatter = resonant.accept_candidate(basis(end), pol, ran);
+        if (scatter) {
+          scatter_data = *scatter;
+          return EvolveResult::Scattered;
+        }
+        tau = std::log(ran.U());
+        cursor = end;
       }
+
       if (geodesic_event == 0 && std::cos(geodesic.stepper.y_new[2]) < 0)
         return EvolveResult::Absorbed;
       if (geodesic_event == 1 && std::cos(geodesic.stepper.y_new[2]) > 0) {
