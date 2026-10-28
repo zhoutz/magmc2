@@ -3,5 +3,6 @@ build/
 data/
 __pycache__/
 ext/
+.vscode/
 .DS_Store
 compile_commands.json
