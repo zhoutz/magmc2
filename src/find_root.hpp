@@ -82,7 +82,7 @@ ridders_root(F const& func, double x1, double x2, double f1, double f2,
       fh = fx;
     }
   };
-  int i = 64;
+  int i = 128;
   while (i--) {
     if ((xh - xl) <= xacc)
       return std::midpoint(xl, xh);

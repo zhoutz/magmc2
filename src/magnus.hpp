@@ -128,11 +128,10 @@ struct StepperMagnus {
       h_old = h;
       h_new = h * factor;
       y_new = second.after;
-      phase_advance =
-          (0.5 * (mid - x_old)) * norm(first.omega[1]) +
-          (0.5 * (mid - x_old)) * norm(first.omega[2]) +
-          (0.5 * (end - mid)) * norm(second.omega[1]) +
-          (0.5 * (end - mid)) * norm(second.omega[2]);
+      phase_advance = (0.5 * (mid - x_old)) * norm(first.omega[1]) +
+                      (0.5 * (mid - x_old)) * norm(first.omega[2]) +
+                      (0.5 * (end - mid)) * norm(second.omega[1]) +
+                      (0.5 * (end - mid)) * norm(second.omega[2]);
       prepared = true;
       return true;
     }
@@ -247,5 +246,89 @@ private:
     segment.rotation =
         magnus_rotation(segment.omega[1], segment.omega[2], end - begin);
     return segment;
+  }
+};
+
+struct StepperMagnusWithoutDense {
+  double x_old = 0, x_new = 0, x_max = 0;
+  double h_old = 0, h_new = 0;
+  Stokes y_old{}, y_new{};
+  double atol, rtol;
+
+  StepperMagnusWithoutDense(double atol = 1e-6, double rtol = 1e-6)
+      : atol(atol), rtol(rtol) {}
+
+  void
+  init(double x_init, double x_end, double h_init, Stokes const& y_init) {
+    x_old = x_new = x_init;
+    x_max = x_end;
+    h_old = h_new = h_init;
+    y_old = y_new = y_init;
+  }
+
+  template <class DerivFunc>
+  bool
+  do_step(DerivFunc const& derivs) {
+    if (x_old == x_max)
+      return false;
+    double requested = std::min(h_old, x_max - x_old);
+    while (true) {
+      double end = (requested == x_max - x_old) ? x_max : (x_old + requested);
+      double mid = std::midpoint(x_old, end);
+      if (!(x_old < mid && mid < end))
+        throw std::runtime_error("Stepsize underflow in StepperMagnus");
+
+      Rotation whole = sample(derivs, x_old, end);
+      Rotation first = sample(derivs, x_old, mid),
+               second = sample(derivs, mid, end);
+      auto coarse = whole.apply(y_old);
+      auto fine = second.apply(first.apply(y_old));
+      double delta = (1.0 / 15) * (fine - coarse).length();
+      double scale = atol + rtol * std::max(y_old.length(), fine.length());
+      double err = delta / scale;
+
+      double factor =
+          err == 0 ? 3 : std::clamp(0.9 * std::pow(err, -0.2), 0.2, 3.0);
+
+      if (err > 1) {
+        requested *= factor;
+        continue;
+      }
+
+      x_new = end;
+      h_old = requested;
+      h_new = requested * factor;
+      y_new = fine;
+      return true;
+    }
+  }
+
+  void
+  update_old() {
+    x_old = x_new;
+    y_old = y_new;
+    h_old = h_new;
+  }
+
+private:
+  static constexpr double g = 0.28867513459481288225;
+  static constexpr std::array<double, 2> nodes{0.5 - g, 0.5 + g};
+
+  static
+  Rotation
+  magnus_rotation(double3 w1, double3 w2, double h) {
+    constexpr double a = 0.53867513459481288225, b = -0.03867513459481288225;
+    auto first = Rotation::exponential(h * (a * w1 + b * w2));
+    auto second = Rotation::exponential(h * (b * w1 + a * w2));
+    return Rotation::compose(second, first);
+  }
+
+  template <class DerivFunc>
+  Rotation
+  sample(DerivFunc const& derivs, double begin, double end) const {
+    Rotation rotation =
+        magnus_rotation(derivs(std::lerp(begin, end, nodes[0])),
+                        derivs(std::lerp(begin, end, nodes[1])), end - begin);
+    return rotation;
   }
 };
