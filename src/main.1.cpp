@@ -41,8 +41,8 @@ main() try {
       std::make_tuple(powerlaw_electron, powerlaw_positron));
 
   int start_seed = 42;
-  int N_group = 7840;
-  int group_size = 10000;
+  int N_group = 1536;
+  int group_size = 100000;
   int n_threads = 23;
   std::string error_log_file = "data/error.log";
 
