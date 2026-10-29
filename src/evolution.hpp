@@ -24,7 +24,7 @@ struct Basis {
     double3 k_hat = std::cos(alpha) * r_hat + std::sin(alpha) * psi_hat;
     double3 s1 = cross(n, k_hat);
     double muz = std::clamp(r_hat.z, -1.0, 1.0);
-    double rho = std::hypot(r_hat.x, r_hat.y);
+    double rho = std::sqrt(r_hat.x * r_hat.x + r_hat.y * r_hat.y);
     double3 theta_hat =
         rho > 0 ? double3{r_hat.x * muz / rho, r_hat.y * muz / rho, -rho}
                 : double3{std::copysign(1.0, muz), 0, 0};

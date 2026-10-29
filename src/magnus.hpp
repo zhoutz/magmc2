@@ -37,6 +37,7 @@ struct Rotation {
   }
 };
 
+#if 0
 // Fourth-order commutator-free Magnus integration of S' = omega(x) cross S.
 // DerivFunc is a caller-owned callable returning double3, independent of S.
 // Tolerances control the endpoint step-doubling estimate, NOT an independent
@@ -248,6 +249,7 @@ private:
     return segment;
   }
 };
+#endif
 
 struct StepperMagnusWithoutDense {
   double x_old = 0, x_new = 0, x_max = 0;
@@ -255,7 +257,7 @@ struct StepperMagnusWithoutDense {
   Stokes y_old{}, y_new{};
   double atol, rtol;
 
-  StepperMagnusWithoutDense(double atol = 1e-6, double rtol = 1e-6)
+  StepperMagnusWithoutDense(double atol = 1e-4, double rtol = 1e-4)
       : atol(atol), rtol(rtol) {}
 
   void

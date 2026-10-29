@@ -1,7 +1,7 @@
 #pragma once
 
 #include "doubles.hpp"
-// #include <variant>
+#include <cmath>
 
 enum class AdiabaticPolarization { O, E };
 using Stokes = double3;
@@ -76,7 +76,7 @@ struct Polarization {
     }
     u = to_unit(u);
     double c = dot(u, cross(normal, k)), s = dot(u, normal);
-    double norm = std::hypot(c, s);
+    double norm = std::sqrt(c * c + s * s);
     c /= norm;
     s /= norm;
     double c2 = c * c - s * s, s2 = 2 * c * s;

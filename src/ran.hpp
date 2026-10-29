@@ -96,10 +96,10 @@ struct Ran {
 
     double3 u;
     if (std::abs(n.x) > std::abs(n.z)) {
-      double t = 1.0 / std::hypot(n.x, n.y);
+      double t = 1.0 / std::sqrt(n.x * n.x + n.y * n.y);
       u = {-n.y * t, n.x * t, 0.0};
     } else {
-      double t = 1.0 / std::hypot(n.y, n.z);
+      double t = 1.0 / std::sqrt(n.y * n.y + n.z * n.z);
       u = {0.0, -n.z * t, n.y * t};
     }
 

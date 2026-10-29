@@ -7,10 +7,13 @@
 
 struct Geodesic {
   struct Options {
-    double orbit_atol = 1e-10;
-    double orbit_rtol = 1e-10;
+    double orbit_atol = 1e-6;
+    double orbit_rtol = 1e-6;
     double escape_factor = 1e5;
-    Options() : orbit_atol(1e-10), orbit_rtol(1e-10), escape_factor(1e5) {}
+    double max_step_fraction = 0.8;
+    Options()
+        : orbit_atol(1e-6), orbit_rtol(1e-6), escape_factor(1e5),
+          max_step_fraction(0.8) {}
   } options;
 
   using State = std::array<double, 3>;
@@ -24,7 +27,7 @@ struct Geodesic {
     // absorb at the surface
     stepper.add_event(
         [R_star](double, State const& y) { return y[0] - R_star; });
-    // escape at escape_factor*R_star
+    // escape at (escape_factor * R_star)
     stepper.add_event([R_star, options](double, State const& y) {
       return y[0] - options.escape_factor * R_star;
     });
@@ -46,7 +49,7 @@ struct Geodesic {
 
   int
   step() {
-    stepper.do_step(0.1 * stepper.y_old[0]);
+    stepper.do_step(options.max_step_fraction * stepper.y_old[0]);
     return stepper.detect_event();
   }
 

@@ -101,7 +101,7 @@ ridders_root(F const& func, double x1, double x2, double f1, double f2,
     double b = fh / scale;
     double c = fm / scale;
     double q = std::sqrt(std::abs(a)) * std::sqrt(std::abs(b));
-    double s = std::hypot(c, q);
+    double s = std::sqrt(c * c + q * q);
 
     double xn = xm;
     if (s > 0.0) {
