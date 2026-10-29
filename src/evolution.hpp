@@ -159,7 +159,7 @@ struct PhotonEvolution {
             if (outward_and_far_enough &&
                 stokes_change < options.delta_stokes &&
                 resonant.resonance_escape(stepper.h_old, basis(stepper.x_old),
-                                          basis(stepper.x_new))) {
+                                          basis(y))) {
               record_escape(y);
               return EvolveResult::Escaped;
             }
