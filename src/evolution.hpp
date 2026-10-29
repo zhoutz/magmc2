@@ -127,7 +127,7 @@ class TransportCache {
   }
 
 public:
-  explicit TransportCache(double tolerance = 1e-5) : tolerance(tolerance) {}
+  explicit TransportCache(double tolerance = 1e-3) : tolerance(tolerance) {}
   template <class F>
   void
   reset(double left, double right, F const& exact) {
@@ -245,8 +245,7 @@ struct PhotonEvolution {
 
       double cursor = geodesic.l_old();
       auto exact = [&](double l) { return basis(l); };
-      if (!pol.is_adiabatic)
-        transport_cache.reset(cursor, geodesic.l_new(), exact);
+      transport_cache.reset(cursor, geodesic.l_new(), exact);
       auto coefficients = [&](double l) {
         return transport_cache.at(l, exact);
       };
