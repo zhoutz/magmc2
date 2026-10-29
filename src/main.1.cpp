@@ -41,9 +41,9 @@ main() try {
       std::make_tuple(powerlaw_electron, powerlaw_positron));
 
   int start_seed = 42;
-  int N_group = 100;
-  int group_size = 1000;
-  int n_threads = 4;
+  int N_group = 7840;
+  int group_size = 10000;
+  int n_threads = 23;
   std::string error_log_file = "data/error.log";
 
   OutputHDF5 output("data/output.h5");
