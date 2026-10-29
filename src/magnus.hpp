@@ -14,7 +14,7 @@ struct Rotation {
   static
   Rotation
   exponential(double3 a) {
-    double angle = std::hypot(a.x, a.y, a.z);
+    double angle = a.length();
     if (!std::isfinite(angle))
       throw std::runtime_error("Non-finite rotation in StepperMagnus");
     double scale =
@@ -272,6 +272,7 @@ struct StepperMagnusWithoutDense {
     if (x_old == x_max)
       return false;
     double requested = std::min(h_old, x_max - x_old);
+    double old_norm = y_old.length();
     while (true) {
       double end = (requested == x_max - x_old) ? x_max : (x_old + requested);
       double mid = std::midpoint(x_old, end);
@@ -284,7 +285,7 @@ struct StepperMagnusWithoutDense {
       auto coarse = whole.apply(y_old);
       auto fine = second.apply(first.apply(y_old));
       double delta = (1.0 / 15) * (fine - coarse).length();
-      double scale = atol + rtol * std::max(y_old.length(), fine.length());
+      double scale = atol + rtol * std::max(old_norm, fine.length());
       double err = delta / scale;
 
       double factor =
