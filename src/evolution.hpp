@@ -8,7 +8,10 @@
 #include "quad.hpp"
 #include "ran.hpp"
 #include <algorithm>
+#include <array>
 #include <cmath>
+#include <numeric>
+#include <vector>
 
 struct Basis {
   double3 r_hat, B, omega;
@@ -49,6 +52,109 @@ struct Basis {
   }
 };
 
+struct TransportCoefficients {
+  double Bmag, energy_local, J, mu;
+  double3 omega;
+};
+
+class TransportCache {
+  using Values = std::array<double, 7>;
+  struct Segment {
+    double left, right;
+    std::array<Values, 5> differences;
+    bool direct = false;
+    Values
+    at(double l) const {
+      double u = 4 * ((l - left) / (right - left));
+      Values out;
+      for (int j = 0; j < 7; ++j)
+        out[j] = differences[0][j] +
+                 u * (differences[1][j] +
+                      (u - 1) * (differences[2][j] / 2 +
+                                 (u - 2) * (differences[3][j] / 6 +
+                                            (u - 3) * differences[4][j] / 24)));
+      return out;
+    }
+  };
+  std::vector<Segment> segments;
+  double tolerance;
+
+  template <class F>
+  static
+  Values
+  sample(F const& exact, double l) {
+    auto b = exact(l);
+    return {b.Bmag, b.energy_local, b.J, b.mu, b.omega.x, b.omega.y, b.omega.z};
+  }
+
+  template <class F>
+  void
+  add(double left, double right, F const& exact, int depth) {
+    Segment s{left, right, {}};
+    std::array<Values, 9> values;
+    for (int k = 0; k < 9; ++k)
+      values[k] = sample(exact, std::lerp(left, right, k / 8.));
+    auto d = std::array<Values, 5>{values[0], values[2], values[4], values[6],
+                                   values[8]};
+    for (int k = 0; k < 5; ++k) {
+      s.differences[k] = d[0];
+      for (int i = 0; i < 4 - k; ++i)
+        for (int j = 0; j < 7; ++j)
+          d[i][j] = d[i + 1][j] - d[i][j];
+    }
+    Values scale{};
+    for (auto const& v : values)
+      for (int j = 0; j < 7; ++j)
+        scale[j] = std::max(scale[j], std::abs(v[j]));
+    scale[3] = 1;
+    scale[4] = scale[5] = scale[6] = std::sqrt(
+        scale[4] * scale[4] + scale[5] * scale[5] + scale[6] * scale[6]);
+    bool accurate = true;
+    for (int k : {1, 3, 5, 7}) {
+      auto estimate = s.at(std::lerp(left, right, k / 8.));
+      for (int j = 0; j < 7; ++j)
+        accurate &= std::abs(estimate[j] - values[k][j]) <=
+                    tolerance * std::max(scale[j], 1e-100);
+    }
+    if (!accurate && depth < 4) {
+      double mid = std::midpoint(left, right);
+      add(left, mid, exact, depth + 1);
+      add(mid, right, exact, depth + 1);
+    } else {
+      s.direct = !accurate;
+      segments.push_back(s);
+    }
+  }
+
+public:
+  explicit TransportCache(double tolerance = 1e-5) : tolerance(tolerance) {}
+  template <class F>
+  void
+  reset(double left, double right, F const& exact) {
+    segments.clear();
+    if (right > left)
+      add(left, right, exact, 0);
+  }
+  template <class F>
+  TransportCoefficients
+  at(double l, F const& exact) const {
+    auto it = std::lower_bound(
+        segments.begin(), segments.end(), l,
+        [](Segment const& s, double l) { return s.right < l; });
+    if (it == segments.end() || l < it->left || it->direct) {
+      auto b = exact(l);
+      return {b.Bmag, b.energy_local, b.J, b.mu, b.omega};
+    }
+    auto v = it->at(l);
+    // Positive endpoint samples do not guarantee a positive polynomial.
+    if (!(v[0] > 0 && v[1] > 0 && v[2] >= 0 && std::abs(v[3]) <= 1)) {
+      auto b = exact(l);
+      return {b.Bmag, b.energy_local, b.J, b.mu, b.omega};
+    }
+    return {v[0], v[1], v[2], v[3], {v[4], v[5], v[6]}};
+  }
+};
+
 enum class EvolveResult { Absorbed, Escaped, Scattered };
 
 template <PhotonInitializer Init, typename Scat>
@@ -63,6 +169,7 @@ struct PhotonEvolution {
   Ran ran;
   Geodesic geodesic;
   Quad quad;
+  TransportCache transport_cache;
 
   double3 n, e1, e2;
   double energy_inf, tau;
@@ -137,16 +244,23 @@ struct PhotonEvolution {
       }
 
       double cursor = geodesic.l_old();
+      auto exact = [&](double l) { return basis(l); };
+      if (!pol.is_adiabatic)
+        transport_cache.reset(cursor, geodesic.l_new(), exact);
+      auto coefficients = [&](double l) {
+        return transport_cache.at(l, exact);
+      };
       while (cursor < geodesic.l_new()) {
-        auto candidate = resonant.next_candidate(
-            cursor, geodesic.l_new(), [&](double l) { return basis(l); }, tau,
-            quad);
+        auto candidate = resonant.next_candidate(cursor, geodesic.l_new(),
+                                                 coefficients, tau, quad);
         double end = candidate.value_or(geodesic.l_new());
 
         if (!pol.is_adiabatic) {
           StepperMagnusWithoutDense stepper;
           stepper.init(cursor, end, end - cursor, pol.stokes);
-          auto stokes_rotation = [&](double l) { return basis(l).omega; };
+          auto stokes_rotation = [&](double l) {
+            return coefficients(l).omega;
+          };
           while (stepper.do_step(stokes_rotation)) {
             pol.set_stokes(stepper.y_new);
             Geodesic::State y = geodesic.interp(stepper.x_new);

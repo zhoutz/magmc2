@@ -126,14 +126,15 @@ struct ResonantScattering {
     });
   }
 
+  template <class Geometry>
   Rates
-  rates_enveloped(Basis const& b) const {
+  rates_enveloped(Geometry const& b) const {
     return rates_impl(b, [](double mup, int) { return (1 + mup * mup) / 2; });
   }
 
-  template <class OverlapFunc>
+  template <class Geometry, class OverlapFunc>
   Rates
-  rates_impl(Basis const& b, OverlapFunc const& get_overlap) const {
+  rates_impl(Geometry const& b, OverlapFunc const& get_overlap) const {
     Rates result{};
 
     if (!std::isfinite(b.J) || b.J < 0)
