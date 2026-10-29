@@ -1,4 +1,5 @@
 #pragma once
+#include "diagnostics.hpp"
 
 #include "polarization.hpp"
 #include <algorithm>
@@ -114,6 +115,7 @@ struct StepperMagnus {
       double factor =
           err == 0 ? 3 : std::clamp(0.9 * std::pow(err, -0.2), 0.2, 3.0);
       if (err > 1) {
+        MC_COUNT(magnus_reject);
         requested = h * factor;
         continue;
       }
@@ -124,6 +126,7 @@ struct StepperMagnus {
       first.omega[3] = second.omega[0] = coefficient(derivs, mid);
       second.omega[3] = coefficient(derivs, end);
       segments = {first, second};
+      MC_COUNT(magnus_accept);
       x_new = end;
       h_old = h;
       h_new = h * factor;
@@ -292,10 +295,12 @@ struct StepperMagnusWithoutDense {
           err == 0 ? 3 : std::clamp(0.9 * std::pow(err, -0.2), 0.2, 3.0);
 
       if (err > 1) {
+        MC_COUNT(magnus_reject);
         requested *= factor;
         continue;
       }
 
+      MC_COUNT(magnus_accept);
       x_new = end;
       h_old = requested;
       h_new = requested * factor;

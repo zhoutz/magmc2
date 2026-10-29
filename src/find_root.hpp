@@ -1,4 +1,5 @@
 #pragma once
+#include "diagnostics.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -10,6 +11,7 @@ template <class F>
 double
 bisect_root(F const& func, double x1, double x2, double f1, double f2,
             double xacc = 0) {
+  MC_COUNT(roots);
   if (xacc < 0)
     throw std::invalid_argument("xacc must be non-negative");
   if (std::isnan(f1) || std::isnan(f2))
@@ -49,6 +51,7 @@ template <class F>
 double
 ridders_root(F const& func, double x1, double x2, double f1, double f2,
              double xacc = 0) {
+  MC_COUNT(roots);
   if (xacc < 0)
     throw std::invalid_argument("xacc must be non-negative");
   if (std::isnan(f1) || std::isnan(f2))

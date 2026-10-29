@@ -1,4 +1,5 @@
 #pragma once
+#include "diagnostics.hpp"
 
 #include <cmath>
 #include <cstdlib>
@@ -23,7 +24,10 @@ struct Quad {
   double
   qags(F& fn, double a, double b, double epsabs, double epsrel) {
     gsl_function gf;
-    gf.function = +[](double x, void* p) { return (*static_cast<F*>(p))(x); };
+    gf.function = +[](double x, void* p) {
+      MC_COUNT(quad_samples);
+      return (*static_cast<F*>(p))(x);
+    };
     gf.params = &fn;
     double result, abserr;
     int status = gsl_integration_qags(&gf, a, b, epsabs, epsrel, limit,

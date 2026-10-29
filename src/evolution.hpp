@@ -1,4 +1,5 @@
 #pragma once
+#include "diagnostics.hpp"
 
 #include "bfield.hpp"
 #include "geodesic.hpp"
@@ -7,6 +8,7 @@
 #include "polarization.hpp"
 #include "quad.hpp"
 #include "ran.hpp"
+#include "transport_cache.hpp"
 #include <algorithm>
 #include <cmath>
 
@@ -24,7 +26,10 @@ struct Basis {
     double3 k_hat = std::cos(alpha) * r_hat + std::sin(alpha) * psi_hat;
     double3 s1 = cross(n, k_hat);
     double muz = std::clamp(r_hat.z, -1.0, 1.0);
-    double rho = std::hypot(r_hat.x, r_hat.y);
+    // r_hat is a unit vector: overflow is impossible. Keep hypot only for
+    // extremely small polar coordinates, where squaring could underflow.
+    double rho2 = r_hat.x * r_hat.x + r_hat.y * r_hat.y;
+    double rho = rho2 > 1e-200 ? std::sqrt(rho2) : std::hypot(r_hat.x, r_hat.y);
     double3 theta_hat =
         rho > 0 ? double3{r_hat.x * muz / rho, r_hat.y * muz / rho, -rho}
                 : double3{std::copysign(1.0, muz), 0, 0};
@@ -54,7 +59,11 @@ enum class EvolveResult { Absorbed, Escaped, Scattered };
 template <PhotonInitializer Init, typename Scat>
 struct PhotonEvolution {
   struct Options {
-    double eta_couple = 1e-3, delta_stokes = 1e-3;
+    double eta_couple = 1e-2, delta_stokes = 1e-3;
+    Geodesic::Options orbit;
+    double magnus_atol = 1e-4, magnus_rtol = 1e-4;
+    double cache_tolerance = 1e-3;
+    bool cache_enabled = true;
   } options;
 
   BField const& bfield;
@@ -63,18 +72,23 @@ struct PhotonEvolution {
   Ran ran;
   Geodesic geodesic;
   Quad quad;
+  TransportCache transport_cache;
+  typename Scat::Workspace scattering_workspace;
 
   double3 n, e1, e2;
   double energy_inf, tau;
+  double polarization_step = 0;
   Polarization pol;
 
   PhotonEvolution(double M_star, double R_star, int seed, BField const& bfield,
                   Init const& init, Scat const& scat, Options options = {})
       : options(options), bfield(bfield), initializer(init), resonant(scat),
-        ran(seed), geodesic(M_star, R_star) {}
+        ran(seed), geodesic(M_star, R_star, options.orbit),
+        transport_cache(options.cache_tolerance) {}
 
   Basis
   basis(Geodesic::State y) const {
+    MC_COUNT(basis);
     auto [r, psi, alpha] = y;
     return Basis(r, psi, alpha, n, e1, e2, bfield, energy_inf, geodesic.rs);
   }
@@ -98,6 +112,7 @@ struct PhotonEvolution {
     energy_inf = photon.energy_inf;
     tau = std::log(ran.U());
     pol = photon.pol;
+    polarization_step = 0;
   }
 
   void
@@ -130,23 +145,66 @@ struct PhotonEvolution {
   evolve() {
     while (true) {
       int geodesic_event = geodesic.step();
+      Basis old_basis = basis(geodesic.l_old());
       if (pol.is_adiabatic) {
-        Basis b = basis(geodesic.l_old());
+        Basis const& b = old_basis;
         if (options.eta_couple * b.kappa * b.r < 1)
           pol.set_stokes(b.c, b.s);
       }
 
       double cursor = geodesic.l_old();
+      // |dr/dl| <= 1, so this also bounds inward and turning trajectories.
+      // E_local >= E_inf: omitting the redshift gives an upper bound on xe.
+      double r_min = std::max(geodesic.R_star, geodesic.stepper.y_old[0] -
+                                                   (geodesic.l_new() - cursor));
+      bool possible_resonance = resonant.can_resonate(
+          B_to_energy *
+              bfield.min_strength_at(geodesic.stepper.y_old[0] +
+                                     (geodesic.l_new() - cursor)) *
+              std::sqrt(1 - geodesic.rs / geodesic.R_star) / energy_inf,
+          B_to_energy * bfield.max_strength_at(r_min) / energy_inf);
+      auto exact = [&](double l) {
+        return l == geodesic.l_old() ? old_basis : basis(l);
+      };
+      // Weak, smooth rotations normally need only the six Magnus samples.
+      // In that regime constructing a nine-sample interpolant costs more.
+      bool use_cache = options.cache_enabled &&
+                       (possible_resonance ||
+                        (!pol.is_adiabatic &&
+                         old_basis.kappa * (geodesic.l_new() - cursor) > .25));
+      if (use_cache)
+        transport_cache.reset(cursor, geodesic.l_new(), exact, !pol.is_adiabatic);
+      auto coefficients = [&](double l) {
+        if (use_cache)
+          return transport_cache.at(l, exact);
+        auto b = exact(l);
+        return TransportCoefficients{b.Bmag, b.energy_local, b.J, b.mu,
+                                     b.omega};
+      };
+      auto optical_coefficients = [&](double l) {
+        if (use_cache) return transport_cache.optical_at(l,exact);
+        auto b = exact(l);
+        return OpticalCoefficients{b.Bmag,b.energy_local,b.J,b.mu};
+      };
       while (cursor < geodesic.l_new()) {
-        auto candidate = resonant.next_candidate(
-            cursor, geodesic.l_new(), [&](double l) { return basis(l); }, tau,
-            quad);
+        auto candidate = possible_resonance
+                             ? resonant.next_candidate(cursor, geodesic.l_new(),
+                                                       optical_coefficients, tau, quad,
+                                                       scattering_workspace)
+                             : std::nullopt;
         double end = candidate.value_or(geodesic.l_new());
 
         if (!pol.is_adiabatic) {
-          StepperMagnusWithoutDense stepper;
-          stepper.init(cursor, end, end - cursor, pol.stokes);
-          auto stokes_rotation = [&](double l) { return basis(l).omega; };
+          MC_TIMER(polarization_seconds);
+          StepperMagnusWithoutDense stepper(options.magnus_atol,
+                                            options.magnus_rtol);
+          double initial_step = polarization_step > 0
+                                    ? std::min(polarization_step, end - cursor)
+                                    : end - cursor;
+          stepper.init(cursor, end, initial_step, pol.stokes);
+          auto stokes_rotation = [&](double l) {
+            return coefficients(l).omega;
+          };
           while (stepper.do_step(stokes_rotation)) {
             pol.set_stokes(stepper.y_new);
             Geodesic::State y = geodesic.interp(stepper.x_new);
@@ -163,6 +221,7 @@ struct PhotonEvolution {
             }
             stepper.update_old();
           }
+          polarization_step = stepper.h_new;
         }
 
         if (!candidate)

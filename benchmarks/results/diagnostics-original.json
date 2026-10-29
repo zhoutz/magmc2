@@ -1,0 +1,18 @@
+{
+  "count": 10000,
+  "seed": 42,
+  "escaped": 9939,
+  "absorbed": 61,
+  "scattered": 14504,
+  "basis": 53420274,
+  "field": 53420274,
+  "scans": 1931110,
+  "roots": 152547,
+  "quad_samples": 12761595,
+  "magnus_accept": 3004805,
+  "magnus_reject": 854273,
+  "orbit_steps": 1921457,
+  "optical_seconds": 3.349466,
+  "polarization_seconds": 2.711714,
+  "instrumented_seconds": 6.627205
+}

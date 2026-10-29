@@ -1,0 +1,19 @@
+{
+  "date": "2026-10-30",
+  "timezone": "Asia/Shanghai",
+  "system": "macOS-15.7.3-arm64-arm-64bit",
+  "architecture": "arm64",
+  "compiler": "g++-16 (Homebrew GCC 16.2.0) 16.2.0",
+  "flags": [
+    "-std=c++23",
+    "-O3",
+    "-march=native"
+  ],
+  "threads": 1,
+  "baseline_commit": "70b7c2218d9520011f0bf02314d353a97837204e",
+  "input_sha256": {
+    "table/bfield_t10.txt": "fc947c28074590bcbea69314e1edbaaaf855c8f84f24c421d3acb05e7f2cda94"
+  },
+  "cpu": "unavailable",
+  "gsl": "2.8"
+}

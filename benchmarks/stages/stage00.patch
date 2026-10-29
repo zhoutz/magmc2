@@ -1,0 +1,289 @@
+--- a/src/bfield.hpp
++++ b/src/bfield.hpp
+@@ -1,4 +1,5 @@
+ #pragma once
++#include "diagnostics.hpp"
+ 
+ #include "constants.hpp"
+ #include "doubles.hpp"
+@@ -82,6 +83,7 @@
+ 
+   BFieldResult
+   evaluate(double r, double mu) const {
++    MC_COUNT(field);
+     double mu_sign = (mu >= 0) ? 1 : -1;
+     mu = std::abs(mu);
+ 
+--- /dev/null
++++ b/src/diagnostics.hpp
+@@ -0,0 +1,26 @@
++#pragma once
++
++#ifdef MAGMC_DIAGNOSTICS
++#include <chrono>
++#include <cstdio>
++namespace diagnostic {
++inline unsigned long long basis = 0, field = 0, scans = 0, roots = 0,
++                          quad_samples = 0, magnus_accept = 0, magnus_reject = 0,
++                          orbit_steps = 0;
++inline double optical_seconds = 0, polarization_seconds = 0;
++struct Timer {
++  double& total;
++  std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
++  explicit Timer(double& total) : total(total) {}
++  ~Timer() { total += std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count(); }
++};
++inline void report() {
++  std::fprintf(stderr, "{\"basis\":%llu,\"field\":%llu,\"scans\":%llu,\"roots\":%llu,\"quad_samples\":%llu,\"magnus_accept\":%llu,\"magnus_reject\":%llu,\"orbit_steps\":%llu,\"optical_seconds\":%.9g,\"polarization_seconds\":%.9g}\n", basis,field,scans,roots,quad_samples,magnus_accept,magnus_reject,orbit_steps,optical_seconds,polarization_seconds);
++}
++}
++#define MC_COUNT(name) (++diagnostic::name)
++#define MC_TIMER(name) diagnostic::Timer timer_##name(diagnostic::name)
++#else
++#define MC_COUNT(name) ((void)0)
++#define MC_TIMER(name) ((void)0)
++#endif
+--- a/src/evolution.hpp
++++ b/src/evolution.hpp
+@@ -1,4 +1,5 @@
+ #pragma once
++#include "diagnostics.hpp"
+ 
+ #include "bfield.hpp"
+ #include "geodesic.hpp"
+@@ -75,6 +76,7 @@
+ 
+   Basis
+   basis(Geodesic::State y) const {
++    MC_COUNT(basis);
+     auto [r, psi, alpha] = y;
+     return Basis(r, psi, alpha, n, e1, e2, bfield, energy_inf, geodesic.rs);
+   }
+@@ -144,6 +146,7 @@
+         double end = candidate.value_or(geodesic.l_new());
+ 
+         if (!pol.is_adiabatic) {
++          MC_TIMER(polarization_seconds);
+           StepperMagnusWithoutDense stepper;
+           stepper.init(cursor, end, end - cursor, pol.stokes);
+           auto stokes_rotation = [&](double l) { return basis(l).omega; };
+--- a/src/find_root.hpp
++++ b/src/find_root.hpp
+@@ -1,4 +1,5 @@
+ #pragma once
++#include "diagnostics.hpp"
+ 
+ #include <algorithm>
+ #include <cmath>
+@@ -10,6 +11,7 @@
+ double
+ bisect_root(F const& func, double x1, double x2, double f1, double f2,
+             double xacc = 0) {
++  MC_COUNT(roots);
+   if (xacc < 0)
+     throw std::invalid_argument("xacc must be non-negative");
+   if (std::isnan(f1) || std::isnan(f2))
+@@ -49,6 +51,7 @@
+ double
+ ridders_root(F const& func, double x1, double x2, double f1, double f2,
+              double xacc = 0) {
++  MC_COUNT(roots);
+   if (xacc < 0)
+     throw std::invalid_argument("xacc must be non-negative");
+   if (std::isnan(f1) || std::isnan(f2))
+--- a/src/geodesic.hpp
++++ b/src/geodesic.hpp
+@@ -1,4 +1,5 @@
+ #pragma once
++#include "diagnostics.hpp"
+ 
+ #include "constants.hpp"
+ #include "dopr5.hpp"
+@@ -46,6 +47,7 @@
+ 
+   int
+   step() {
++    MC_COUNT(orbit_steps);
+     stepper.do_step(0.1 * stepper.y_old[0]);
+     return stepper.detect_event();
+   }
+--- a/src/magnus.hpp
++++ b/src/magnus.hpp
+@@ -1,4 +1,5 @@
+ #pragma once
++#include "diagnostics.hpp"
+ 
+ #include "polarization.hpp"
+ #include <algorithm>
+@@ -114,6 +115,7 @@
+       double factor =
+           err == 0 ? 3 : std::clamp(0.9 * std::pow(err, -0.2), 0.2, 3.0);
+       if (err > 1) {
++        MC_COUNT(magnus_reject);
+         requested = h * factor;
+         continue;
+       }
+@@ -124,6 +126,7 @@
+       first.omega[3] = second.omega[0] = coefficient(derivs, mid);
+       second.omega[3] = coefficient(derivs, end);
+       segments = {first, second};
++      MC_COUNT(magnus_accept);
+       x_new = end;
+       h_old = h;
+       h_new = h * factor;
+@@ -292,10 +295,12 @@
+           err == 0 ? 3 : std::clamp(0.9 * std::pow(err, -0.2), 0.2, 3.0);
+ 
+       if (err > 1) {
++        MC_COUNT(magnus_reject);
+         requested *= factor;
+         continue;
+       }
+ 
++      MC_COUNT(magnus_accept);
+       x_new = end;
+       h_old = requested;
+       h_new = requested * factor;
+--- a/src/main.cpp
++++ b/src/main.cpp
+@@ -4,9 +4,45 @@
+ #include "resonant.hpp"
+ #include <print>
+ #include <tuple>
++#include <charconv>
++#include <chrono>
++#include <climits>
++#include <cstdio>
++#include <stdexcept>
++#include <string_view>
++#include "diagnostics.hpp"
+ 
+ int
+-main() {
++main(int argc, char** argv) try {
++  int N = 10000, seed = 42;
++  std::string_view output = "text";
++  bool summary = false;
++  auto integer = [](std::string_view value) {
++    int result;
++    auto [end, error] = std::from_chars(value.data(), value.data() + value.size(), result);
++    if (error != std::errc{} || end != value.data() + value.size() || result < 0)
++      throw std::invalid_argument("Expected a non-negative integer");
++    return result;
++  };
++  for (int i = 1; i < argc; ++i) {
++    std::string_view arg = argv[i];
++    if (arg == "--help") {
++      std::println("Usage: main [--count N] [--seed N] [--output text|csv|none] [--summary]");
++      return 0;
++    }
++    if (arg == "--summary") { summary = true; continue; }
++    if (i + 1 == argc) throw std::invalid_argument("Missing option value");
++    std::string_view value = argv[++i];
++    if (arg == "--count") N = integer(value);
++    else if (arg == "--seed") seed = integer(value);
++    else if (arg == "--output") output = value;
++    else throw std::invalid_argument("Unknown option");
++  }
++  if (N == 0 || seed > INT_MAX - (N - 1))
++    throw std::invalid_argument("Invalid photon count or seed range");
++  if (output != "text" && output != "csv" && output != "none")
++    throw std::invalid_argument("Output must be text, csv, or none");
++  auto start = std::chrono::steady_clock::now();
+   double M_star = 1.4;
+   double R_star = 10;
+   double B_pole = 1e14;
+@@ -28,25 +64,47 @@
+   ResonantScattering resonant(
+       std::make_tuple(powerlaw_electron, powerlaw_positron));
+ 
+-  int N = 10000;
++  int escaped = 0, absorbed = 0;
++  long long scattered = 0;
++  if (output == "csv") std::println("seed,escaped,n_scattered,energy_inf,muk,Q,U,V");
++  auto simulation_start = std::chrono::steady_clock::now();
+   for (int i = 0; i < N; ++i) {
+-    PhotonEvolution photon(M_star, R_star, 42 + i, bfield, initializer,
++    PhotonEvolution photon(M_star, R_star, seed + i, bfield, initializer,
+                            resonant);
+     photon.init();
++    int n_scattered = 0;
+     while (true) {
+       auto result = photon.evolve();
+       if (result == EvolveResult::Scattered) {
+-        // std::println("Scattered: beta={}", photon.scatter_data.beta);
++        ++n_scattered;
++        ++scattered;
+         photon.perform_scattering();
+       } else if (result == EvolveResult::Escaped) {
+         auto const& e = photon.escape_data;
+-        std::println("Escaped: energy_inf={} muk={} Q={} U={} V={}",
++        ++escaped;
++        if (output == "csv")
++          std::println("{},{},{},{},{},{},{},{}", seed + i, 1, n_scattered, e.energy_inf, e.muk, e.Q, e.U, e.V);
++        if (output == "text") std::println("Escaped: energy_inf={} muk={} Q={} U={} V={}",
+                      e.energy_inf, e.muk, e.Q, e.U, e.V);
+         break;
+       } else {
+-        std::println("Absorbed");
++        ++absorbed;
++        if (output == "csv") std::println("{},{},{},0,0,0,0,0", seed + i, 0, n_scattered);
++        if (output == "text") std::println("Absorbed");
+         break;
+       }
+     }
+   }
++  auto finish = std::chrono::steady_clock::now();
++  if (summary) std::fprintf(stderr,
++    "{\"count\":%d,\"seed\":%d,\"escaped\":%d,\"absorbed\":%d,\"scattered\":%lld,\"total_seconds\":%.9g,\"loop_seconds\":%.9g}\n",
++    N, seed, escaped, absorbed, scattered,
++    std::chrono::duration<double>(finish - start).count(),
++    std::chrono::duration<double>(finish - simulation_start).count());
++#ifdef MAGMC_DIAGNOSTICS
++  diagnostic::report();
++#endif
++} catch (std::exception const& error) {
++  std::fprintf(stderr, "Simulation failed: %s\n", error.what());
++  return 1;
+ }
+--- a/src/quad.hpp
++++ b/src/quad.hpp
+@@ -1,4 +1,5 @@
+ #pragma once
++#include "diagnostics.hpp"
+ 
+ #include <cmath>
+ #include <cstdlib>
+@@ -23,7 +24,7 @@
+   double
+   qags(F& fn, double a, double b, double epsabs, double epsrel) {
+     gsl_function gf;
+-    gf.function = +[](double x, void* p) { return (*static_cast<F*>(p))(x); };
++    gf.function = +[](double x, void* p) { MC_COUNT(quad_samples); return (*static_cast<F*>(p))(x); };
+     gf.params = &fn;
+     double result, abserr;
+     int status = gsl_integration_qags(&gf, a, b, epsabs, epsrel, limit,
+--- a/src/resonant.hpp
++++ b/src/resonant.hpp
+@@ -1,4 +1,5 @@
+ #pragma once
++#include "diagnostics.hpp"
+ 
+ #include "constants.hpp"
+ #include "doubles.hpp"
+@@ -210,6 +211,7 @@
+   template <class BasisAt>
+   std::vector<double>
+   integration_cuts(double left, double right, BasisAt const& get_basis) const {
++    MC_COUNT(scans);
+     std::vector<double> cuts{left, right};
+     struct ScanPoint {
+       double l, xe, mu;
+@@ -267,6 +269,7 @@
+   std::optional<double>
+   next_candidate(double left, double right, BasisAt const& get_basis,
+                  double& tau, Quad& quad) const {
++    MC_TIMER(optical_seconds);
+     auto envelope = [&](double l) {
+       return total_rate(rates_enveloped(get_basis(l)));
+     };

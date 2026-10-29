@@ -1,0 +1,200 @@
+{
+  "base": "70b7c2218d9520011f0bf02314d353a97837204e",
+  "count": 10000,
+  "seed": 42,
+  "output": "text",
+  "repeats": 5,
+  "records": {
+    "stage11": [
+      {
+        "wall_seconds": 0.9733459170000005,
+        "summary": {
+          "count": 10000,
+          "seed": 42,
+          "escaped": 9940,
+          "absorbed": 60,
+          "scattered": 14508,
+          "total_seconds": 0.961154,
+          "loop_seconds": 0.94843
+        }
+      },
+      {
+        "wall_seconds": 0.9649684579999995,
+        "summary": {
+          "count": 10000,
+          "seed": 42,
+          "escaped": 9940,
+          "absorbed": 60,
+          "scattered": 14508,
+          "total_seconds": 0.952344,
+          "loop_seconds": 0.940287
+        }
+      },
+      {
+        "wall_seconds": 0.9741382080000012,
+        "summary": {
+          "count": 10000,
+          "seed": 42,
+          "escaped": 9940,
+          "absorbed": 60,
+          "scattered": 14508,
+          "total_seconds": 0.961535,
+          "loop_seconds": 0.949404
+        }
+      },
+      {
+        "wall_seconds": 0.969562916000001,
+        "summary": {
+          "count": 10000,
+          "seed": 42,
+          "escaped": 9940,
+          "absorbed": 60,
+          "scattered": 14508,
+          "total_seconds": 0.956375,
+          "loop_seconds": 0.944015
+        }
+      },
+      {
+        "wall_seconds": 0.9699775000000024,
+        "summary": {
+          "count": 10000,
+          "seed": 42,
+          "escaped": 9940,
+          "absorbed": 60,
+          "scattered": 14508,
+          "total_seconds": 0.956883,
+          "loop_seconds": 0.944573
+        }
+      }
+    ],
+    "stage12": [
+      {
+        "wall_seconds": 0.9412899580000005,
+        "summary": {
+          "count": 10000,
+          "seed": 42,
+          "escaped": 9940,
+          "absorbed": 60,
+          "scattered": 14503,
+          "total_seconds": 0.928334,
+          "loop_seconds": 0.916082
+        }
+      },
+      {
+        "wall_seconds": 0.9307874579999993,
+        "summary": {
+          "count": 10000,
+          "seed": 42,
+          "escaped": 9940,
+          "absorbed": 60,
+          "scattered": 14503,
+          "total_seconds": 0.917011,
+          "loop_seconds": 0.904412
+        }
+      },
+      {
+        "wall_seconds": 0.9358687920000008,
+        "summary": {
+          "count": 10000,
+          "seed": 42,
+          "escaped": 9940,
+          "absorbed": 60,
+          "scattered": 14503,
+          "total_seconds": 0.923233,
+          "loop_seconds": 0.910733
+        }
+      },
+      {
+        "wall_seconds": 0.9292361249999992,
+        "summary": {
+          "count": 10000,
+          "seed": 42,
+          "escaped": 9940,
+          "absorbed": 60,
+          "scattered": 14503,
+          "total_seconds": 0.916999,
+          "loop_seconds": 0.904537
+        }
+      },
+      {
+        "wall_seconds": 0.9496981250000012,
+        "summary": {
+          "count": 10000,
+          "seed": 42,
+          "escaped": 9940,
+          "absorbed": 60,
+          "scattered": 14503,
+          "total_seconds": 0.936543,
+          "loop_seconds": 0.924216
+        }
+      }
+    ],
+    "stage13": [
+      {
+        "wall_seconds": 0.9246209169999986,
+        "summary": {
+          "count": 10000,
+          "seed": 42,
+          "escaped": 9940,
+          "absorbed": 60,
+          "scattered": 14503,
+          "total_seconds": 0.91217,
+          "loop_seconds": 0.899743
+        }
+      },
+      {
+        "wall_seconds": 0.9245920419999987,
+        "summary": {
+          "count": 10000,
+          "seed": 42,
+          "escaped": 9940,
+          "absorbed": 60,
+          "scattered": 14503,
+          "total_seconds": 0.911504,
+          "loop_seconds": 0.898883
+        }
+      },
+      {
+        "wall_seconds": 0.925284542,
+        "summary": {
+          "count": 10000,
+          "seed": 42,
+          "escaped": 9940,
+          "absorbed": 60,
+          "scattered": 14503,
+          "total_seconds": 0.912538,
+          "loop_seconds": 0.900107
+        }
+      },
+      {
+        "wall_seconds": 0.9249874590000005,
+        "summary": {
+          "count": 10000,
+          "seed": 42,
+          "escaped": 9940,
+          "absorbed": 60,
+          "scattered": 14503,
+          "total_seconds": 0.911632,
+          "loop_seconds": 0.89916
+        }
+      },
+      {
+        "wall_seconds": 0.9369388329999992,
+        "summary": {
+          "count": 10000,
+          "seed": 42,
+          "escaped": 9940,
+          "absorbed": 60,
+          "scattered": 14503,
+          "total_seconds": 0.923867,
+          "loop_seconds": 0.911117
+        }
+      }
+    ]
+  },
+  "medians": {
+    "stage11": 0.9699775000000024,
+    "stage12": 0.9358687920000008,
+    "stage13": 0.9249874590000005
+  }
+}

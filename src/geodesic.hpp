@@ -1,4 +1,5 @@
 #pragma once
+#include "diagnostics.hpp"
 
 #include "constants.hpp"
 #include "dopr5.hpp"
@@ -7,10 +8,11 @@
 
 struct Geodesic {
   struct Options {
-    double orbit_atol = 1e-10;
-    double orbit_rtol = 1e-10;
+    double orbit_atol = 1e-5;
+    double orbit_rtol = 1e-5;
     double escape_factor = 1e5;
-    Options() : orbit_atol(1e-10), orbit_rtol(1e-10), escape_factor(1e5) {}
+    double max_step_fraction = 0.8;
+    Options() = default;
   } options;
 
   using State = std::array<double, 3>;
@@ -18,7 +20,10 @@ struct Geodesic {
   double rs, R_star;
   StepperDopr5<3, Geodesic> stepper;
 
-  Geodesic(double M_star, double R_star, Options options = {})
+  Geodesic(double M_star, double R_star)
+      : Geodesic(M_star, R_star, Options{}) {}
+
+  Geodesic(double M_star, double R_star, Options options)
       : options(options), rs(M_star * schwarzschild_radius_of_sun_in_km),
         R_star(R_star), stepper(*this, options.orbit_atol, options.orbit_rtol) {
     // absorb at the surface
@@ -46,7 +51,8 @@ struct Geodesic {
 
   int
   step() {
-    stepper.do_step(0.1 * stepper.y_old[0]);
+    MC_COUNT(orbit_steps);
+    stepper.do_step(options.max_step_fraction * stepper.y_old[0]);
     return stepper.detect_event();
   }
 

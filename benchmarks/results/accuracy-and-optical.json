@@ -1,0 +1,389 @@
+{
+  "base": "70b7c2218d9520011f0bf02314d353a97837204e",
+  "count": 10000,
+  "seed": 42,
+  "output": "text",
+  "repeats": 5,
+  "records": {
+    "release": [
+      {
+        "wall_seconds": 0.6591155840000003,
+        "summary": {
+          "count": 10000,
+          "seed": 42,
+          "escaped": 9940,
+          "absorbed": 60,
+          "scattered": 14487,
+          "total_seconds": 0.644783,
+          "loop_seconds": 0.643563
+        }
+      },
+      {
+        "wall_seconds": 0.6383852089999991,
+        "summary": {
+          "count": 10000,
+          "seed": 42,
+          "escaped": 9940,
+          "absorbed": 60,
+          "scattered": 14487,
+          "total_seconds": 0.625369,
+          "loop_seconds": 0.624147
+        }
+      },
+      {
+        "wall_seconds": 0.6377104589999991,
+        "summary": {
+          "count": 10000,
+          "seed": 42,
+          "escaped": 9940,
+          "absorbed": 60,
+          "scattered": 14487,
+          "total_seconds": 0.624378,
+          "loop_seconds": 0.623226
+        }
+      },
+      {
+        "wall_seconds": 0.6393885410000024,
+        "summary": {
+          "count": 10000,
+          "seed": 42,
+          "escaped": 9940,
+          "absorbed": 60,
+          "scattered": 14487,
+          "total_seconds": 0.62615,
+          "loop_seconds": 0.624787
+        }
+      },
+      {
+        "wall_seconds": 0.6392942080000026,
+        "summary": {
+          "count": 10000,
+          "seed": 42,
+          "escaped": 9940,
+          "absorbed": 60,
+          "scattered": 14487,
+          "total_seconds": 0.625994,
+          "loop_seconds": 0.624823
+        }
+      }
+    ],
+    "try_magnus": [
+      {
+        "wall_seconds": 0.6600343749999995,
+        "summary": {
+          "count": 10000,
+          "seed": 42,
+          "escaped": 9940,
+          "absorbed": 60,
+          "scattered": 14487,
+          "total_seconds": 0.646606,
+          "loop_seconds": 0.645415
+        }
+      },
+      {
+        "wall_seconds": 0.6559511669999996,
+        "summary": {
+          "count": 10000,
+          "seed": 42,
+          "escaped": 9940,
+          "absorbed": 60,
+          "scattered": 14487,
+          "total_seconds": 0.642892,
+          "loop_seconds": 0.641743
+        }
+      },
+      {
+        "wall_seconds": 0.6589350409999994,
+        "summary": {
+          "count": 10000,
+          "seed": 42,
+          "escaped": 9940,
+          "absorbed": 60,
+          "scattered": 14487,
+          "total_seconds": 0.645627,
+          "loop_seconds": 0.644419
+        }
+      },
+      {
+        "wall_seconds": 0.6610376249999987,
+        "summary": {
+          "count": 10000,
+          "seed": 42,
+          "escaped": 9940,
+          "absorbed": 60,
+          "scattered": 14487,
+          "total_seconds": 0.64807,
+          "loop_seconds": 0.646962
+        }
+      },
+      {
+        "wall_seconds": 0.6619982909999997,
+        "summary": {
+          "count": 10000,
+          "seed": 42,
+          "escaped": 9940,
+          "absorbed": 60,
+          "scattered": 14487,
+          "total_seconds": 0.64868,
+          "loop_seconds": 0.647473
+        }
+      }
+    ],
+    "try_couple": [
+      {
+        "wall_seconds": 0.655459542,
+        "summary": {
+          "count": 10000,
+          "seed": 42,
+          "escaped": 9940,
+          "absorbed": 60,
+          "scattered": 14486,
+          "total_seconds": 0.641835,
+          "loop_seconds": 0.640576
+        }
+      },
+      {
+        "wall_seconds": 0.6547052089999994,
+        "summary": {
+          "count": 10000,
+          "seed": 42,
+          "escaped": 9940,
+          "absorbed": 60,
+          "scattered": 14486,
+          "total_seconds": 0.641513,
+          "loop_seconds": 0.640358
+        }
+      },
+      {
+        "wall_seconds": 0.6564846250000009,
+        "summary": {
+          "count": 10000,
+          "seed": 42,
+          "escaped": 9940,
+          "absorbed": 60,
+          "scattered": 14486,
+          "total_seconds": 0.643486,
+          "loop_seconds": 0.64223
+        }
+      },
+      {
+        "wall_seconds": 0.6643600419999984,
+        "summary": {
+          "count": 10000,
+          "seed": 42,
+          "escaped": 9940,
+          "absorbed": 60,
+          "scattered": 14486,
+          "total_seconds": 0.650527,
+          "loop_seconds": 0.64935
+        }
+      },
+      {
+        "wall_seconds": 0.656838999999998,
+        "summary": {
+          "count": 10000,
+          "seed": 42,
+          "escaped": 9940,
+          "absorbed": 60,
+          "scattered": 14486,
+          "total_seconds": 0.642974,
+          "loop_seconds": 0.641795
+        }
+      }
+    ],
+    "try_cache": [
+      {
+        "wall_seconds": 0.7745728749999996,
+        "summary": {
+          "count": 10000,
+          "seed": 42,
+          "escaped": 9940,
+          "absorbed": 60,
+          "scattered": 14490,
+          "total_seconds": 0.761785,
+          "loop_seconds": 0.760569
+        }
+      },
+      {
+        "wall_seconds": 0.7832764159999996,
+        "summary": {
+          "count": 10000,
+          "seed": 42,
+          "escaped": 9940,
+          "absorbed": 60,
+          "scattered": 14490,
+          "total_seconds": 0.768797,
+          "loop_seconds": 0.767463
+        }
+      },
+      {
+        "wall_seconds": 0.7943127919999977,
+        "summary": {
+          "count": 10000,
+          "seed": 42,
+          "escaped": 9940,
+          "absorbed": 60,
+          "scattered": 14490,
+          "total_seconds": 0.78057,
+          "loop_seconds": 0.779336
+        }
+      },
+      {
+        "wall_seconds": 0.7918229580000009,
+        "summary": {
+          "count": 10000,
+          "seed": 42,
+          "escaped": 9940,
+          "absorbed": 60,
+          "scattered": 14490,
+          "total_seconds": 0.777929,
+          "loop_seconds": 0.776739
+        }
+      },
+      {
+        "wall_seconds": 0.7818450420000005,
+        "summary": {
+          "count": 10000,
+          "seed": 42,
+          "escaped": 9940,
+          "absorbed": 60,
+          "scattered": 14490,
+          "total_seconds": 0.768798,
+          "loop_seconds": 0.767653
+        }
+      }
+    ],
+    "try_optical": [
+      {
+        "wall_seconds": 0.6312000000000006,
+        "summary": {
+          "count": 10000,
+          "seed": 42,
+          "escaped": 9940,
+          "absorbed": 60,
+          "scattered": 14487,
+          "total_seconds": 0.618385,
+          "loop_seconds": 0.61729
+        }
+      },
+      {
+        "wall_seconds": 0.6573056249999993,
+        "summary": {
+          "count": 10000,
+          "seed": 42,
+          "escaped": 9940,
+          "absorbed": 60,
+          "scattered": 14487,
+          "total_seconds": 0.644032,
+          "loop_seconds": 0.642806
+        }
+      },
+      {
+        "wall_seconds": 0.6504575830000014,
+        "summary": {
+          "count": 10000,
+          "seed": 42,
+          "escaped": 9940,
+          "absorbed": 60,
+          "scattered": 14487,
+          "total_seconds": 0.63617,
+          "loop_seconds": 0.634861
+        }
+      },
+      {
+        "wall_seconds": 0.647836625,
+        "summary": {
+          "count": 10000,
+          "seed": 42,
+          "escaped": 9940,
+          "absorbed": 60,
+          "scattered": 14487,
+          "total_seconds": 0.634173,
+          "loop_seconds": 0.633076
+        }
+      },
+      {
+        "wall_seconds": 0.6374400410000014,
+        "summary": {
+          "count": 10000,
+          "seed": 42,
+          "escaped": 9940,
+          "absorbed": 60,
+          "scattered": 14487,
+          "total_seconds": 0.624598,
+          "loop_seconds": 0.623409
+        }
+      }
+    ],
+    "try_optical_build": [
+      {
+        "wall_seconds": 0.6405653750000013,
+        "summary": {
+          "count": 10000,
+          "seed": 42,
+          "escaped": 9940,
+          "absorbed": 60,
+          "scattered": 14487,
+          "total_seconds": 0.627253,
+          "loop_seconds": 0.626127
+        }
+      },
+      {
+        "wall_seconds": 0.6302145420000009,
+        "summary": {
+          "count": 10000,
+          "seed": 42,
+          "escaped": 9940,
+          "absorbed": 60,
+          "scattered": 14487,
+          "total_seconds": 0.61716,
+          "loop_seconds": 0.615949
+        }
+      },
+      {
+        "wall_seconds": 0.6448992500000017,
+        "summary": {
+          "count": 10000,
+          "seed": 42,
+          "escaped": 9940,
+          "absorbed": 60,
+          "scattered": 14487,
+          "total_seconds": 0.631282,
+          "loop_seconds": 0.630125
+        }
+      },
+      {
+        "wall_seconds": 0.6581885000000014,
+        "summary": {
+          "count": 10000,
+          "seed": 42,
+          "escaped": 9940,
+          "absorbed": 60,
+          "scattered": 14487,
+          "total_seconds": 0.645238,
+          "loop_seconds": 0.644109
+        }
+      },
+      {
+        "wall_seconds": 0.6538858750000003,
+        "summary": {
+          "count": 10000,
+          "seed": 42,
+          "escaped": 9940,
+          "absorbed": 60,
+          "scattered": 14487,
+          "total_seconds": 0.640235,
+          "loop_seconds": 0.639107
+        }
+      }
+    ]
+  },
+  "medians": {
+    "release": 0.6392942080000026,
+    "try_magnus": 0.6600343749999995,
+    "try_couple": 0.6564846250000009,
+    "try_cache": 0.7832764159999996,
+    "try_optical": 0.647836625,
+    "try_optical_build": 0.6448992500000017
+  }
+}

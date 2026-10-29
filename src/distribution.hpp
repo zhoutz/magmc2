@@ -178,6 +178,7 @@ struct PowerLaw2 {
         log_speed_ratio +
         std::log1p(delta * (b_max + b_min) / ((s_min + s_max) * (1 + s_max)));
     inv_abs_b_mean = 1 / (inv_norm * moment);
+    inv_moment = 1 / moment;
   }
 
   double
@@ -189,8 +190,18 @@ struct PowerLaw2 {
     return inv_norm / (b * b * std::sqrt((1 - b) * (1 + b)));
   }
 
+  // f(beta) * inv_abs_b_mean * resonance Jacobian. The two sqrt(1-beta^2)
+  // factors cancel analytically; this changes neither the distribution nor
+  // its support. Generic distributions retain the original evaluation path.
+  double
+  resonant_weight(double b, double x, double sqrtD) const {
+    if (!std::isfinite(b) || b <= b_min || b >= b_max)
+      return 0;
+    return inv_moment * x * x * (1 - b) * (1 + b) / (b * b * sqrtD);
+  }
+
 private:
-  double inv_norm;
+  double inv_norm, inv_moment;
 };
 
 template <ParticleDistribution Dist>
@@ -205,5 +216,12 @@ struct NegateDist {
   double
   f(double b) const {
     return dist.f(-b);
+  }
+
+  double
+  resonant_weight(double b, double x, double sqrtD) const
+    requires requires(Dist const& d) { d.resonant_weight(0., 0., 0.); }
+  {
+    return dist.resonant_weight(-b, x, sqrtD);
   }
 };

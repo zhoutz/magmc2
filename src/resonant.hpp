@@ -1,9 +1,11 @@
 #pragma once
+#include "diagnostics.hpp"
 
 #include "constants.hpp"
 #include "doubles.hpp"
 #include "evolution.hpp"
 #include "find_root.hpp"
+#include "gauss_kronrod.hpp"
 #include "initialize.hpp"
 #include "polarization.hpp"
 #include "quad.hpp"
@@ -12,6 +14,7 @@
 #include <array>
 #include <cmath>
 #include <cstddef>
+#include <limits>
 #include <optional>
 #include <stdexcept>
 #include <tuple>
@@ -26,16 +29,31 @@ struct ResonantScattering {
   static_assert(n_components > 0,
                 "At least one scattering component is required");
   struct Options {
-    double quad_atol = 1e-6, quad_rtol = 1e-6;
+    double quad_atol = 1e-4, quad_rtol = 1e-4;
+    bool fast_quadrature = true;
     // n_knots sets the constructor's velocity grid;
     // n_scan is used per interval.
     // n_od_sample is used to skip intervals with no resonance.
-    int n_knots = 4, n_scan = 4, n_od_sample = 4;
+    int n_knots = 2, n_scan = 4, n_od_sample = 4;
   } options;
 
   // Distributions and their bounds use signed velocities along B.
   std::tuple<Comps...> components;
   std::array<std::vector<double>, n_components> knots;
+  double min_resonant_xe = std::numeric_limits<double>::infinity();
+  double max_resonant_xe = 0;
+  struct Boundary {
+    double ratio, beta, inv_gamma;
+  };
+  std::vector<Boundary> boundaries;
+  std::vector<double> discriminant_ratios;
+  struct ScanPoint {
+    double l, xe, mu;
+  };
+  struct Workspace {
+    std::vector<double> cuts;
+    std::vector<ScanPoint> grid;
+  };
 
   template <class F>
   void
@@ -57,7 +75,27 @@ struct ResonantScattering {
       for (int j = 0; j < options.n_knots; ++j)
         knots[i].push_back(std::lerp(comp.dist.b_min, comp.dist.b_max,
                                      double(j) / (options.n_knots - 1)));
+      if (comp.current_fraction > 0) {
+        if (std::find(discriminant_ratios.begin(), discriminant_ratios.end(),
+                      comp.charge_mass_ratio) == discriminant_ratios.end())
+          discriminant_ratios.push_back(comp.charge_mass_ratio);
+        for (double beta : knots[i])
+          boundaries.push_back({comp.charge_mass_ratio, beta,
+                                std::sqrt((1 - beta) * (1 + beta))});
+        double speed =
+            std::max(std::abs(comp.dist.b_min), std::abs(comp.dist.b_max));
+        double minimum = speed < 1 ? std::sqrt((1 - speed) / (1 + speed)) : 0;
+        min_resonant_xe =
+            std::min(min_resonant_xe, minimum / comp.charge_mass_ratio);
+        max_resonant_xe =
+            std::max(max_resonant_xe, 1 / (minimum * comp.charge_mass_ratio));
+      }
     });
+  }
+
+  bool
+  can_resonate(double min_xe, double max_xe) const {
+    return !(max_xe < min_resonant_xe || min_xe > max_resonant_xe);
   }
 
   struct ScatterData {
@@ -126,14 +164,15 @@ struct ResonantScattering {
     });
   }
 
+  template <class Geometry>
   Rates
-  rates_enveloped(Basis const& b) const {
+  rates_enveloped(Geometry const& b) const {
     return rates_impl(b, [](double mup, int) { return (1 + mup * mup) / 2; });
   }
 
-  template <class OverlapFunc>
+  template <class Geometry, class OverlapFunc>
   Rates
-  rates_impl(Basis const& b, OverlapFunc const& get_overlap) const {
+  rates_impl(Geometry const& b, OverlapFunc const& get_overlap) const {
     Rates result{};
 
     if (!std::isfinite(b.J) || b.J < 0)
@@ -149,28 +188,43 @@ struct ResonantScattering {
     // J is J_physical/c, expressed with lengths in km, so rates are per km.
     double current_factor = 4 * pi * pi * b.J / b.Bmag;
     double xe = x_e(b.Bmag, b.energy_local);
+    double previous_ratio = -1, x = 0;
+    bool valid_roots = false;
+    std::array<ResonantRoot, 2> roots{};
     for_each_component([&](std::size_t i, auto const& comp) {
       if (comp.current_fraction == 0)
         return;
-      double x = comp.charge_mass_ratio * xe;
-      double D = discriminant(x, b.mu);
+      // Adjacent components with the same charge/mass ratio share both roots.
+      // Their distribution weights and signed polarization overlaps differ.
+      if (comp.charge_mass_ratio != previous_ratio) {
+        previous_ratio = comp.charge_mass_ratio;
+        x = comp.charge_mass_ratio * xe;
+        double D = discriminant(x, b.mu);
+        valid_roots = D > 0 && x > 0;
+        if (valid_roots)
+          roots = resonance_roots(x, b.mu, D);
+      }
       // Exact coalescence is an integration boundary, not a sample.
-      if (!(D > 0) || !(x > 0))
+      if (!valid_roots)
         return;
-      auto roots = resonance_roots(x, b.mu, D);
       for (int j = 0; j < 2; ++j) {
         double beta = roots[j].beta;
         double sqrtD = roots[j].sqrtD;
         double mup = roots[j].mup;
-        double f = comp.dist.f(beta);
-        if (!(beta > -1 && beta < 1) || f == 0)
+        double population_weight;
+        if constexpr (requires { comp.dist.resonant_weight(beta, x, sqrtD); }) {
+          population_weight = comp.dist.resonant_weight(beta, x, sqrtD);
+        } else {
+          double f = comp.dist.f(beta);
+          if (!(beta > -1 && beta < 1) || f == 0)
+            continue;
+          double t = (1 - beta) * (1 + beta);
+          population_weight =
+              comp.dist.inv_abs_b_mean * f * x * x * t * std::sqrt(t) / sqrtD;
+        }
+        if (population_weight == 0)
           continue;
-        double t = (1 - beta) * (1 + beta);
-        // Equivalent to (1-beta*mu)^2(1-beta^2)/abs(mu-beta),
-        // but avoids cancellation at coalescing roots.
-        double jacobian = x * x * t * std::sqrt(t) / sqrtD;
-        double w = current_factor * comp.current_fraction *
-                   comp.dist.inv_abs_b_mean * f * jacobian *
+        double w = current_factor * comp.current_fraction * population_weight *
                    get_overlap(mup, comp.charge_sign);
         if (!std::isfinite(w) || w < 0)
           throw std::runtime_error("Invalid differential optical depth");
@@ -208,19 +262,22 @@ struct ResonantScattering {
   }
 
   template <class BasisAt>
-  std::vector<double>
-  integration_cuts(double left, double right, BasisAt const& get_basis) const {
-    std::vector<double> cuts{left, right};
-    struct ScanPoint {
-      double l, xe, mu;
-    };
+  std::vector<double>&
+  integration_cuts(double left, double right, BasisAt const& get_basis,
+                   Workspace& workspace) const {
+    MC_COUNT(scans);
+    auto& cuts = workspace.cuts;
+    cuts.clear();
+    cuts.push_back(left);
+    cuts.push_back(right);
     auto sample = [&](double l) {
       auto b = get_basis(l);
       return ScanPoint{l, x_e(b.Bmag, b.energy_local), b.mu};
     };
     // All boundary functions share this grid. Cache only the geometry they
     // need; root-finding trial points still evaluate the actual trajectory.
-    std::vector<ScanPoint> grid;
+    auto& grid = workspace.grid;
+    grid.clear();
     grid.reserve(options.n_scan);
     for (int j = 0; j < options.n_scan; ++j)
       grid.push_back(
@@ -245,18 +302,12 @@ struct ResonantScattering {
       }
     };
 
-    for_each_component([&](std::size_t i, auto const& comp) {
-      if (comp.current_fraction == 0)
-        return;
-      double ratio = comp.charge_mass_ratio;
+    for (double ratio : discriminant_ratios)
       scan([&](double xe, double mu) { return discriminant(ratio * xe, mu); });
-      for (double beta : knots[i]) {
-        double inv_gamma = std::sqrt((1 - beta) * (1 + beta));
-        scan([&](double xe, double mu) {
-          return ratio * xe * inv_gamma + beta * mu - 1;
-        });
-      }
-    });
+    for (auto b : boundaries)
+      scan([&](double xe, double mu) {
+        return b.ratio * xe * b.inv_gamma + b.beta * mu - 1;
+      });
 
     std::sort(cuts.begin(), cuts.end());
     cuts.erase(std::unique(cuts.begin(), cuts.end()), cuts.end());
@@ -264,13 +315,30 @@ struct ResonantScattering {
   }
 
   template <class BasisAt>
+  std::vector<double>
+  integration_cuts(double left, double right, BasisAt const& get_basis) const {
+    Workspace workspace;
+    integration_cuts(left, right, get_basis, workspace);
+    return std::move(workspace.cuts);
+  }
+
+  template <class BasisAt>
   std::optional<double>
   next_candidate(double left, double right, BasisAt const& get_basis,
                  double& tau, Quad& quad) const {
+    Workspace workspace;
+    return next_candidate(left, right, get_basis, tau, quad, workspace);
+  }
+
+  template <class BasisAt>
+  std::optional<double>
+  next_candidate(double left, double right, BasisAt const& get_basis,
+                 double& tau, Quad& quad, Workspace& workspace) const {
+    MC_TIMER(optical_seconds);
     auto envelope = [&](double l) {
       return total_rate(rates_enveloped(get_basis(l)));
     };
-    auto cuts = integration_cuts(left, right, get_basis);
+    auto& cuts = integration_cuts(left, right, get_basis, workspace);
     for (size_t j = 0; j + 1 < cuts.size(); ++j) {
       double a = cuts[j], b = cuts[j + 1];
       {
@@ -287,6 +355,14 @@ struct ResonantScattering {
           continue;
       }
       auto integral = [&](double end) {
+        if (options.fast_quadrature) {
+          auto estimate = gauss_kronrod15(envelope, a, end);
+          if (std::isfinite(estimate.integral) && estimate.integral >= 0 &&
+              std::isfinite(estimate.error) &&
+              estimate.error <= std::max(options.quad_atol,
+                                         options.quad_rtol * estimate.integral))
+            return estimate.integral;
+        }
         return quad.qags(envelope, a, end, options.quad_atol,
                          options.quad_rtol);
       };

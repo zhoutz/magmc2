@@ -1,0 +1,137 @@
+{
+  "base": "70b7c2218d9520011f0bf02314d353a97837204e",
+  "count": 10000,
+  "seed": 42,
+  "output": "text",
+  "repeats": 5,
+  "records": {
+    "stage04": [
+      {
+        "wall_seconds": 2.0313318339999995,
+        "summary": {
+          "count": 10000,
+          "seed": 42,
+          "escaped": 9940,
+          "absorbed": 60,
+          "scattered": 14512,
+          "total_seconds": 2.018858,
+          "loop_seconds": 2.006485
+        }
+      },
+      {
+        "wall_seconds": 2.0492346670000003,
+        "summary": {
+          "count": 10000,
+          "seed": 42,
+          "escaped": 9940,
+          "absorbed": 60,
+          "scattered": 14512,
+          "total_seconds": 2.036105,
+          "loop_seconds": 2.023927
+        }
+      },
+      {
+        "wall_seconds": 2.0533318749999996,
+        "summary": {
+          "count": 10000,
+          "seed": 42,
+          "escaped": 9940,
+          "absorbed": 60,
+          "scattered": 14512,
+          "total_seconds": 2.040098,
+          "loop_seconds": 2.028116
+        }
+      },
+      {
+        "wall_seconds": 2.0389261659999995,
+        "summary": {
+          "count": 10000,
+          "seed": 42,
+          "escaped": 9940,
+          "absorbed": 60,
+          "scattered": 14512,
+          "total_seconds": 2.025826,
+          "loop_seconds": 2.013694
+        }
+      },
+      {
+        "wall_seconds": 2.050382374999998,
+        "summary": {
+          "count": 10000,
+          "seed": 42,
+          "escaped": 9940,
+          "absorbed": 60,
+          "scattered": 14512,
+          "total_seconds": 2.037275,
+          "loop_seconds": 2.0251
+        }
+      }
+    ],
+    "stage05": [
+      {
+        "wall_seconds": 1.8921781249999992,
+        "summary": {
+          "count": 10000,
+          "seed": 42,
+          "escaped": 9940,
+          "absorbed": 60,
+          "scattered": 14488,
+          "total_seconds": 1.879007,
+          "loop_seconds": 1.866684
+        }
+      },
+      {
+        "wall_seconds": 1.9220900420000007,
+        "summary": {
+          "count": 10000,
+          "seed": 42,
+          "escaped": 9940,
+          "absorbed": 60,
+          "scattered": 14488,
+          "total_seconds": 1.908795,
+          "loop_seconds": 1.89653
+        }
+      },
+      {
+        "wall_seconds": 1.9268621249999978,
+        "summary": {
+          "count": 10000,
+          "seed": 42,
+          "escaped": 9940,
+          "absorbed": 60,
+          "scattered": 14488,
+          "total_seconds": 1.913424,
+          "loop_seconds": 1.900814
+        }
+      },
+      {
+        "wall_seconds": 1.9564974999999976,
+        "summary": {
+          "count": 10000,
+          "seed": 42,
+          "escaped": 9940,
+          "absorbed": 60,
+          "scattered": 14488,
+          "total_seconds": 1.942983,
+          "loop_seconds": 1.93072
+        }
+      },
+      {
+        "wall_seconds": 1.9213944589999983,
+        "summary": {
+          "count": 10000,
+          "seed": 42,
+          "escaped": 9940,
+          "absorbed": 60,
+          "scattered": 14488,
+          "total_seconds": 1.908337,
+          "loop_seconds": 1.895958
+        }
+      }
+    ]
+  },
+  "medians": {
+    "stage04": 2.0492346670000003,
+    "stage05": 1.9220900420000007
+  }
+}
