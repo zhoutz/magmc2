@@ -29,7 +29,7 @@ struct Quad {
     int status = gsl_integration_qags(&gf, a, b, epsabs, epsrel, limit,
                                       workspace, &result, &abserr);
 
-    if (!std::isfinite(result) || !std::isfinite(abserr)) {
+    if (status != GSL_SUCCESS || !std::isfinite(result) || !std::isfinite(abserr)) {
       throw std::runtime_error(std::format(
           "qags failed: {} (status={}, result={}, abserr={})\n",
           status == GSL_SUCCESS ? "non-finite output" : gsl_strerror(status),

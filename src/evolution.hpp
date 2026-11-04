@@ -10,11 +10,13 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <functional>
 #include <numeric>
 #include <vector>
 
 struct Basis {
   double3 r_hat, B, omega;
+  double3 k_hat, screen_1, screen_2;
   double r, c, s, kappa, Bmag, mu, J, energy_local;
 
   Basis() = default;
@@ -24,8 +26,10 @@ struct Basis {
     r = radius;
     r_hat = std::cos(psi) * e1 + std::sin(psi) * e2;
     double3 psi_hat = cross(n, r_hat);
-    double3 k_hat = std::cos(alpha) * r_hat + std::sin(alpha) * psi_hat;
+    k_hat = std::cos(alpha) * r_hat + std::sin(alpha) * psi_hat;
     double3 s1 = cross(n, k_hat);
+    screen_1 = s1;
+    screen_2 = n;
     double muz = std::clamp(r_hat.z, -1.0, 1.0);
     double rho = std::sqrt(r_hat.x * r_hat.x + r_hat.y * r_hat.y);
     double3 theta_hat =
@@ -45,6 +49,10 @@ struct Basis {
     double diff = B1 * B1 - B2 * B2, twice = 2 * B1 * B2;
     c = Bperp2 > 0 ? diff / Bperp2 : 1;
     s = Bperp2 > 0 ? twice / Bperp2 : 0;
+    if (Bmag > 0 && cross(k_hat, B / Bmag).length() <= 1e-14) {
+      c = 1;
+      s = 0;
+    }
     energy_local = energy / L;
     double K = 2.013919e-19 * energy_local;
     kappa = K * Bperp2;
@@ -161,11 +169,14 @@ template <PhotonInitializer Init, typename Scat>
 struct PhotonEvolution {
   struct Options {
     double eta_couple = 1e-3, delta_stokes = 1e-3;
+    Geodesic::Options geodesic;
+    // Optional monitoring of the direct reference solver; no physics changes.
+    std::function<void(double, double)> progress;
   } options;
 
   BField const& bfield;
   Init const& initializer;
-  Scat const& resonant;
+  Scat resonant;
   Ran ran;
   Geodesic geodesic;
   Quad quad;
@@ -178,7 +189,7 @@ struct PhotonEvolution {
   PhotonEvolution(double M_star, double R_star, int seed, BField const& bfield,
                   Init const& init, Scat const& scat, Options options = {})
       : options(options), bfield(bfield), initializer(init), resonant(scat),
-        ran(seed), geodesic(M_star, R_star) {}
+        ran(seed), geodesic(M_star, R_star, options.geodesic) {}
 
   Basis
   basis(Geodesic::State y) const {
@@ -198,6 +209,7 @@ struct PhotonEvolution {
   }
   void
   init(InitializedPhoton const& photon) {
+    if constexpr (requires { resonant.reset(); }) resonant.reset();
     geodesic.init(photon.r0, photon.psi0, photon.alpha0);
     n = photon.n;
     e1 = photon.e1;
@@ -209,6 +221,10 @@ struct PhotonEvolution {
 
   void
   record_escape(Geodesic::State y) {
+    if (pol.is_adiabatic) {
+      auto b = basis(y);
+      pol.set_stokes(b.c, b.s);
+    }
     auto [r, psi, alpha] = y;
     double impact = r * std::sin(alpha) / std::sqrt(1 - geodesic.rs / r);
     // u = r/rho maps [r,infinity) to [1,0], with a regular integrand at 0.
@@ -236,6 +252,8 @@ struct PhotonEvolution {
   EvolveResult
   evolve() {
     while (true) {
+      if (options.progress)
+        options.progress(geodesic.l_old(), geodesic.stepper.y_old[0]);
       int geodesic_event = geodesic.step();
       if (pol.is_adiabatic) {
         Basis b = basis(geodesic.l_old());
@@ -250,8 +268,12 @@ struct PhotonEvolution {
         return transport_cache.at(l, exact);
       };
       while (cursor < geodesic.l_new()) {
-        auto candidate = resonant.next_candidate(cursor, geodesic.l_new(),
-                                                 coefficients, tau, quad);
+        auto candidate = [&] {
+          if constexpr (requires { Scat::finite_width; })
+            return resonant.next_candidate(cursor, geodesic.l_new(), exact, tau, quad);
+          else
+            return resonant.next_candidate(cursor, geodesic.l_new(), coefficients, tau, quad);
+        }();
         double end = candidate.value_or(geodesic.l_new());
 
         if (!pol.is_adiabatic) {
@@ -263,16 +285,18 @@ struct PhotonEvolution {
           while (stepper.do_step(stokes_rotation)) {
             pol.set_stokes(stepper.y_new);
             Geodesic::State y = geodesic.interp(stepper.x_new);
-            bool outward_and_far_enough =
-                std::cos(y[2]) > 0 && y[0] > 1e3 * geodesic.R_star;
-            double stokes_change = (stepper.y_new - stepper.y_old).length() *
-                                   y[0] / (stepper.x_new - stepper.x_old);
-            if (outward_and_far_enough &&
-                stokes_change < options.delta_stokes &&
-                resonant.resonance_escape(stepper.h_old, basis(stepper.x_old),
-                                          basis(y))) {
-              record_escape(y);
-              return EvolveResult::Escaped;
+            if constexpr (!requires { Scat::finite_width; }) {
+              bool outward_and_far_enough =
+                  std::cos(y[2]) > 0 && y[0] > 1e3 * geodesic.R_star;
+              double stokes_change = (stepper.y_new - stepper.y_old).length() *
+                                     y[0] / (stepper.x_new - stepper.x_old);
+              if (outward_and_far_enough &&
+                  stokes_change < options.delta_stokes &&
+                  resonant.resonance_escape(stepper.h_old, basis(stepper.x_old),
+                                            basis(y))) {
+                record_escape(y);
+                return EvolveResult::Escaped;
+              }
             }
             stepper.update_old();
           }

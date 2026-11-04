@@ -1,7 +1,7 @@
 #include "bfield.hpp"
 #include "component.hpp"
 #include "evolution.hpp"
-#include "resonant.hpp"
+#include "qed_scattering.hpp"
 #include "result.hpp"
 #include <algorithm>
 #include <atomic>
@@ -37,16 +37,49 @@ main() try {
                                             .current_fraction = 0.5,
                                             .charge_mass_ratio = 1.0};
 
-  ResonantScattering resonant(
-      std::make_tuple(powerlaw_electron, powerlaw_positron));
+  QEDScattering resonant(std::make_tuple(powerlaw_electron, powerlaw_positron));
+  using Evolution = PhotonEvolution<InitFD11, decltype(resonant)>;
+  Evolution::Options evolution_options;
 
   int start_seed = 42;
   int N_group = 1536;
   int group_size = 100000;
   int n_threads = 23;
-  std::string error_log_file = "data/error.log";
+  std::string error_log_file = "data/error_qed_lll.log";
 
-  OutputHDF5 output("data/output.h5");
+  OutputHDF5 output("data/output_qed_lll.h5");
+  auto metadata = [&](std::string const& name, auto const& expected) {
+    using T = std::decay_t<decltype(expected)>;
+    if (output.file.hasAttribute(name)) {
+      T stored;
+      output.file.getAttribute(name).read(stored);
+      if (stored != expected)
+        throw std::runtime_error("Incompatible QED output metadata: " + name);
+    } else {
+      if (output.file.getNumberObjects() != 0)
+        throw std::runtime_error("Existing output lacks QED metadata: " + name);
+      output.file.createAttribute(name, expected);
+    }
+  };
+  metadata("scattering_kernel", std::string(qed::kernel_version));
+  metadata("width_rtol", resonant.options.width_rtol);
+  metadata("angular_rtol", resonant.options.angular_rtol);
+  metadata("speed_rtol", resonant.options.speed_rtol);
+  metadata("path_rtol", resonant.options.path_rtol);
+  metadata("rate_atol_per_km", resonant.options.rate_atol);
+  metadata("outer_radius_Rstar", evolution_options.geodesic.escape_factor);
+  metadata("max_panels", resonant.options.max_panels);
+  metadata("bound_azimuth_tails", int(resonant.options.bound_azimuth_tails));
+  metadata("M_star_solar", M_star);
+  metadata("R_star_km", R_star);
+  metadata("B_pole_gauss", B_pole);
+  metadata("T_inf_keV", T_inf);
+  metadata("electron_current_fraction", powerlaw_electron.current_fraction);
+  metadata("positron_current_fraction", powerlaw_positron.current_fraction);
+  metadata("stream_beta_min", powerlaw_positron.dist.b_min);
+  metadata("stream_beta_max", powerlaw_positron.dist.b_max);
+  metadata("group_size", group_size);
+  metadata("selective_extinction", 0);
   std::ofstream error_log;
   error_log.exceptions(std::ios::failbit | std::ios::badbit);
   error_log.open(error_log_file, std::ios::out | std::ios::app);
@@ -76,7 +109,8 @@ main() try {
 
   auto run_group = [&](int seed) {
     ResultPhotonGroup group(seed);
-    PhotonEvolution photon(M_star, R_star, seed, bfield, initializer, resonant);
+    Evolution photon(M_star, R_star, seed, bfield, initializer, resonant,
+                     evolution_options);
     for (int j = 0; j < group_size; ++j) {
       std::optional<ResultPhoton> escaped;
       try {
@@ -102,10 +136,15 @@ main() try {
           }
         }
       } catch (std::exception const& error) {
-        group.add_failed();
+        auto qed_error = dynamic_cast<qed::Error const*>(&error);
+        bool domain = qed_error && qed_error->kind == qed::Failure::PairDomain;
+        group.add_failed(domain);
         std::string message = error.what();
         std::lock_guard lock(log_mutex);
-        error_log << seed << '\t' << j << '\t' << message << '\n';
+        error_log << seed << '\t' << j << '\t'
+                  << (qed_error ? qed::failure_name(qed_error->kind)
+                                : "transport")
+                  << '\t' << message << '\n';
         error_log.flush();
         continue;
       }

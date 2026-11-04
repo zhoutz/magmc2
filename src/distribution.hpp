@@ -6,6 +6,7 @@
 #include <concepts>
 #include <cstdlib>
 #include <stdexcept>
+#include <vector>
 
 template <class T>
 concept ParticleDistribution = requires(T b, double x) {
@@ -39,6 +40,20 @@ struct Boltzmann {
     double s = std::sqrt((1 - b) * (1 + b));
     double gm1 = b * b / (s * (1 + s));
     return std::exp(-a * gm1) / (exp_k1 * s * s * s);
+  }
+
+  // Quadrature guidance only: retain the entire interval, including both
+  // tails. Cold and ultrarelativistic populations can have narrow PDF peaks.
+  std::vector<double>
+  integration_knots() const {
+    std::vector<double> points;
+    for (double v = b0 / 8; v > 0 && v < 1; v *= 2)
+      points.push_back(v);
+    if (a < 3)
+      for (double d = a * a / 64; d > 0 && d < 1; d *= 2)
+        if (1 - d < 1)
+          points.push_back(1 - d);
+    return points;
   }
 };
 
@@ -205,5 +220,17 @@ struct NegateDist {
   double
   f(double b) const {
     return dist.f(-b);
+  }
+
+  std::vector<double>
+  integration_knots() const {
+    if constexpr (requires { dist.integration_knots(); }) {
+      auto points = dist.integration_knots();
+      for (auto& beta : points)
+        beta = -beta;
+      return points;
+    } else {
+      return {};
+    }
   }
 };
